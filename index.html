@@ -2,12 +2,12 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Rec Room HTML - P2P Multiplayer</title>
+    <title>Rec Room HTML - P2P Multiplayer Fix</title>
     <style>
         body, html { margin: 0; padding: 0; overflow: hidden; width: 100%; height: 100%; font-family: Arial, sans-serif; user-select: none; }
         canvas { display: block; }
         #viseur { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: white; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; border: 1px solid black; }
-        #instructions { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; background: rgba(0,0,0,0.85); padding: 25px; border-radius: 10px; text-align: center; cursor: pointer; z-index: 10; }
+        #instructions { position: absolute; top: 0; left: 0; width: 100%; height: 100%; color: white; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; cursor: pointer; z-index: 10; }
         
         /* MONTRE INTERACTIVE (REC ROOM WATCH) */
         #watch-ui {
@@ -43,17 +43,15 @@
         <p><b>Z, Q, S, D</b> = Se déplacer | <b>Espace</b> = Sauter<br><b>E</b> = Palette Maker Pen | <b>Tab</b> = Ouvrir la Montre (Multi P2P)</p>
     </div>
 
-    <!-- MENU PALETTE MAKER PEN -->
     <div id="maker-menu">
         <h2 style="margin-top:15px;">📐 PALETTE MAKER PEN</h2>
         <div class="menu-content">
-            <button class="menu-btn id="btn-draw" onclick="setTool('draw')">✏️ DESSINER</button>
+            <button class="menu-btn" id="btn-draw" onclick="setTool('draw')">✏️ DESSINER</button>
             <button class="menu-btn" id="btn-delete" onclick="setTool('delete')">❌ SUPPRIMER</button>
         </div>
-        <div id="current-tool-txt">Outil actuel : Aucun</div>
+        <div id="current-tool-txt">Outil actuel : DESSINER</div>
     </div>
 
-    <!-- MONTRE INTERACTIVE MULTIJOUEUR -->
     <div id="watch-ui">
         <div id="watch-sidebar">
             <div style="color: white; font-weight: bold; text-align: center; margin-bottom: 10px;">REC WATCH</div>
@@ -76,7 +74,6 @@
     
     <div id="status-bar">🌐 Statut Multi : Solo | Appuie sur TAB</div>
 
-    <!-- SCRIPTS MOTEUR ET RESEAU -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
@@ -113,7 +110,19 @@
         const makerMenu = document.getElementById('maker-menu');
         const watchUi = document.getElementById('watch-ui');
 
-        instructions.addEventListener('click', () => { if(makerMenu.style.display !== 'flex' && watchUi.style.display !== 'flex') controls.lock(); });
+        // Gestion du clic sur le panneau noir pour l'enlever
+        instructions.addEventListener('click', () => { 
+            if(makerMenu.style.display !== 'flex' && watchUi.style.display !== 'flex') {
+                controls.lock();
+            }
+        });
+        controls.addEventListener('lock', () => instructions.style.display = 'none');
+        controls.addEventListener('unlock', () => { 
+            if(makerMenu.style.display !== 'flex' && watchUi.style.display !== 'flex') {
+                instructions.style.display = 'flex'; 
+            }
+        });
+
         camera.position.set(0, 3, 5);
 
         const keys = { z: false, s: false, q: false, d: false, space: false };
@@ -157,77 +166,45 @@
             menuOpen = false; makerMenu.style.display = 'none'; controls.lock();
         }
 
-        // --- 3. LOGIQUE RESEAU P2P DANS LE NAVIGATEUR (WebRTC) ---
-        let peer = null;
-        let conn = null;
-        let remotePlayerMesh = null; // Avatar de l'autre joueur
+        // --- 3. LOGIQUE RESEAU P2P (WebRTC) ---
+        let peer = null; let conn = null; let remotePlayerMesh = null;
 
-        // Étape 1 : Activer le système P2P du navigateur
         window.initPeer = function() {
             document.getElementById('btn-init-p2p').innerText = "Génération...";
-            // On utilise le serveur cloud public de PeerJS uniquement pour la mise en relation
             peer = new Peer(); 
-
             peer.on('open', (id) => {
                 document.getElementById('my-code-display').innerText = "Mon Code : " + id;
                 document.getElementById('status-bar').innerText = "🌐 En attente d'un ami...";
                 document.getElementById('btn-init-p2p').style.display = 'none';
             });
-
-            // Si quelqu'un d'autre se connecte à notre code
-            peer.on('connection', (connection) => {
-                conn = connection;
-                setupConnectionHandlers();
-            });
+            peer.on('connection', (connection) => { conn = connection; setupConnectionHandlers(); });
         }
 
-        // Étape 2 : Se connecter au code de l'autre joueur
         window.connectToPeer = function() {
             const remoteId = document.getElementById('peer-id-input').value.trim();
-            if(!peer) peer = new Peer(); // S'assurer que Peer est créé
-            
-            peer.on('open', () => {
-                conn = peer.connect(remoteId);
-                setupConnectionHandlers();
-            });
+            if(!peer) peer = new Peer(); 
+            peer.on('open', () => { conn = peer.connect(remoteId); setupConnectionHandlers(); });
         }
 
-        // Configuration de l'échange de données en direct (P2P pur après connexion)
         function setupConnectionHandlers() {
             document.getElementById('status-bar').innerText = "🌐 CONNECTÉ EN MULTIJOUEUR !";
             watchOpen = false; watchUi.style.display = 'none'; controls.lock();
 
-            // Création graphique de l'avatar de l'autre joueur (Capsule)
             const avatarGeo = new THREE.CylinderGeometry(0.4, 0.4, 2, 16);
             const avatarMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
             remotePlayerMesh = new THREE.Mesh(avatarGeo, avatarMat);
             scene.add(remotePlayerMesh);
 
-            // Écouter les actions envoyées par l'autre PC
             conn.on('data', (data) => {
-                if (data.type === 'move') {
-                    // Met à jour la position de l'ami en continu
-                    remotePlayerMesh.position.set(data.x, data.y - 1, data.z);
-                }
-                else if (data.type === 'build') {
-                    // Ajoute le bloc que l'autre vient de dessiner
-                    createCubeGraphics(data.x, data.y, data.z);
-                }
-                else if (data.type === 'delete') {
-                    // Supprime le bloc enlevé par l'autre
-                    removeCubeGraphics(data.x, data.y, data.z);
-                }
+                if (data.type === 'move') { remotePlayerMesh.position.set(data.x, data.y - 1, data.z); }
+                else if (data.type === 'build') { createCubeGraphics(data.x, data.y, data.z); }
+                else if (data.type === 'delete') { removeCubeGraphics(data.x, data.y, data.z); }
             });
         }
 
-        // Envoi d'une info à l'autre PC
-        function sendNetworkData(dataObj) {
-            if (conn && conn.open) {
-                conn.send(dataObj);
-            }
-        }
+        function sendNetworkData(dataObj) { if (conn && conn.open) { conn.send(dataObj); } }
 
-        // --- 4. ENGINE DE CONSTRUCTION SYNCHRONISÉ ---
+        // --- 4. SYSTEME DE DESSIN ---
         const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2(0, 0);
 
         document.addEventListener('pointerdown', () => {
@@ -240,20 +217,15 @@
                     const intersect = intersects[0];
                     const pos = intersect.point.clone().add(intersect.face.normal.clone().multiplyScalar(0.5));
                     const gridX = Math.round(pos.x); const gridY = Math.round(pos.y * 2) / 2; const gridZ = Math.round(pos.z);
-                    
                     createCubeGraphics(gridX, gridY, gridZ);
-                    // On avertit le pote qu'on a posé un bloc
                     sendNetworkData({ type: 'build', x: gridX, y: gridY, z: gridZ });
                 }
-            } 
-            else if (currentTool === 'delete') {
+            } else if (currentTool === 'delete') {
                 const intersects = raycaster.intersectObjects(cubesDessines);
                 if (intersects.length > 0) {
                     const hitCube = intersects[0].object;
                     const cX = hitCube.position.x; const cY = hitCube.position.y; const cZ = hitCube.position.z;
-                    
                     removeCubeGraphics(cX, cY, cZ);
-                    // On avertit le pote qu'on a supprimé ce bloc
                     sendNetworkData({ type: 'delete', x: cX, y: cY, z: cZ });
                 }
             }
@@ -263,14 +235,10 @@
             const cubeGeo = new THREE.BoxGeometry(1, 1, 1);
             const cubeMat = new THREE.MeshStandardMaterial({ color: 0xffa500 });
             const newCube = new THREE.Mesh(cubeGeo, cubeMat);
-            newCube.position.set(x, y, z);
-            scene.add(newCube);
-            targetsClickables.push(newCube);
-            cubesDessines.push(newCube);
+            newCube.position.set(x, y, z); scene.add(newCube); targetsClickables.push(newCube); cubesDessines.push(newCube);
         }
 
         function removeCubeGraphics(x, y, z) {
-            // Trouver le cube correspondant aux coordonnées précises
             const hitCube = cubesDessines.find(c => c.position.x === x && c.position.y === y && c.position.z === z);
             if (hitCube) {
                 scene.remove(hitCube);
@@ -279,9 +247,8 @@
             }
         }
 
-        // --- 5. LOOP DE RENDER ET TRANSMISSION POSITION ---
-        const clock = new THREE.Clock();
-        let lastSendTime = 0;
+        // --- 5. LOOP DU JEU ---
+        const clock = new THREE.Clock(); let lastSendTime = 0;
 
         function animate() {
             requestAnimationFrame(animate); const delta = clock.getDelta();
@@ -298,13 +265,11 @@
                 if (camera.position.y < 3.0) { velocity.y = 0; camera.position.y = 3.0; canJump = true; }
                 if (keys.space && canJump) { velocity.y += 11.0; canJump = false; }
 
-                // Limites murs
                 if(camera.position.x > 14) camera.position.x = 14; if(camera.position.x < -14) camera.position.x = -14;
                 if(camera.position.z > 14) camera.position.z = 14; if(camera.position.z < -14) camera.position.z = -14;
 
-                // Envoyer la position au pote en direct à intervalles réguliers (tick rate réseau)
                 const now = performance.now();
-                if (now - lastSendTime > 40) { // Environ 25 fois par seconde
+                if (now - lastSendTime > 40) { 
                     sendNetworkData({ type: 'move', x: camera.position.x, y: camera.position.y, z: camera.position.z });
                     lastSendTime = now;
                 }
