@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Rec Room HTML - Maker Pen UI</title>
+    <title>Rec Room HTML - Maker Pen System</title>
     <style>
         body, html { margin: 0; padding: 0; overflow: hidden; width: 100%; height: 100%; font-family: Arial, sans-serif; user-select: none; }
         canvas { display: block; }
@@ -19,8 +19,9 @@
         }
         .menu-header { background: #1565C0; padding: 10px; text-align: center; font-size: 18px; border-top-left-radius: 8px; border-top-right-radius: 8px; }
         .menu-content { display: flex; flex-wrap: wrap; padding: 20px; justify-content: space-around; gap: 10px; }
-        .menu-btn { background: #ff9800; border: none; padding: 15px 25px; color: white; font-size: 16px; border-radius: 8px; cursor: pointer; transition: 0.1s; box-shadow: 0 4px #e65100; }
+        .menu-btn { background: #ff9800; border: none; padding: 15px 25px; color: white; font-size: 16px; border-radius: 8px; cursor: pointer; transition: 0.1s; box-shadow: 0 4px #e65100; width: 180px; }
         .menu-btn:active { transform: translateY(4px); box-shadow: none; }
+        .menu-btn.active { background: #4CAF50; box-shadow: 0 4px #388E3C; }
         
         #ui-montre { position: absolute; bottom: 20px; left: 20px; background: rgba(255, 87, 34, 0.9); color: white; padding: 15px; border-radius: 10px; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
     </style>
@@ -32,22 +33,21 @@
     
     <div id="instructions">
         <h2>CLIQUE ICI POUR JOUER</h2>
-        <p><b>Z, Q, S, D</b> = Se déplacer | <b>Espace</b> = Sauter<br><b>Souris</b> = Regarder / Interagir<br><b>E</b> = Ouvrir le Menu du Maker Pen (Une fois ramassé)</p>
+        <p><b>Z, Q, S, D</b> = Se déplacer | <b>Espace</b> = Sauter<br><b>E</b> = Menu du Maker Pen<br><b>Clic gauche</b> = Utiliser l'outil actif</p>
     </div>
 
     <!-- Interface Maker Pen -->
     <div id="maker-menu">
         <div class="menu-header">📐 PALETTE DU MAKER PEN</div>
         <div class="menu-content">
-            <button class="menu-btn" onclick="alert('Outil Dessiner activé !')">✏️ DESSINER</button>
-            <button class="menu-btn" onclick="alert('Outil Déplacer activé !')">🖐️ DÉPLACER</button>
-            <button class="menu-btn" onclick="alert('Outil Supprimer activé !')">❌ SUPPRIMER</button>
-            <button class="menu-btn" onclick="alert('Couleur changée !')">🎨 COULEURS</button>
+            <button class="menu-btn" id="btn-draw" onclick="setTool('draw')">✏️ DESSINER</button>
+            <button class="menu-btn" id="btn-delete" onclick="setTool('delete')">❌ SUPPRIMER</button>
         </div>
-        <div style="text-align:center; padding-bottom:10px; font-size:12px;">Appuie sur 'E' pour fermer</div>
+        <div style="text-align:center; padding-top:20px; font-size:14px;" id="current-tool-txt">Outil actuel : Aucun</div>
+        <div style="text-align:center; padding-top:10px; font-size:12px;">Appuie sur 'E' pour fermer</div>
     </div>
     
-    <div id="ui-montre">⌚ Rec Room v0.3 | Appuie sur E (Maker Pen requis)</div>
+    <div id="ui-montre">⌚ Rec Room v0.4 | Mode Création</div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
@@ -68,16 +68,23 @@
         dirLight.position.set(10, 20, 10);
         scene.add(dirLight);
 
-        // --- SOL ET MURS (DORM ROOM) ---
+        // Listes pour les collisions et interactions
+        const targetsClickables = []; 
+        const cubesDessines = [];
+
+        // Sol (Ajouté à la liste des cibles sur lesquelles on peut dessiner)
         const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: 0xe67e22, roughness: 0.8 }));
         floor.rotation.x = -Math.PI / 2;
         scene.add(floor);
+        targetsClickables.push(floor);
 
+        // Murs
         const wallMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.9 });
         const createWall = (w, h, d, x, y, z) => {
             const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
             wall.position.set(x, y, z);
             scene.add(wall);
+            targetsClickables.push(wall);
         };
         createWall(30, 15, 1, 0, 7.5, -15);
         createWall(1, 15, 30, -15, 7.5, 0);
@@ -87,31 +94,21 @@
         const bed = new THREE.Mesh(new THREE.BoxGeometry(4, 1.5, 6), new THREE.MeshStandardMaterial({ color: 0x2980b9 }));
         bed.position.set(-11, 0.75, -11);
         scene.add(bed);
+        targetsClickables.push(bed);
 
-        // --- CREATION DU GROUPE MAKER PEN ---
+        // --- MAKER PEN ---
         const makerPen = new THREE.Group();
-
-        // Corps principal blanc
-        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.8, 16), new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.4 }));
-        body.rotation.x = Math.PI / 2;
-        makerPen.add(body);
-
-        // Pointe orange
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.8, 16), new THREE.MeshStandardMaterial({ color: 0xdddddd }));
+        body.rotation.x = Math.PI / 2; makerPen.add(body);
         const tip = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.3, 16), new THREE.MeshStandardMaterial({ color: 0xe67e22 }));
-        tip.position.z = -0.55;
-        tip.rotation.x = -Math.PI / 2;
-        makerPen.add(tip);
+        tip.position.z = -0.55; tip.rotation.x = -Math.PI / 2; makerPen.add(tip);
+        const screen = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.05), new THREE.MeshStandardMaterial({ color: 0x34495e }));
+        screen.position.set(0, 0.08, 0.38); makerPen.add(screen);
 
-        // Écran à l'arrière
-        const screen = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.05), new THREE.MeshStandardMaterial({ color: 0x34495e, emissive: 0x112244 }));
-        screen.position.set(0, 0.08, 0.38);
-        makerPen.add(screen);
-
-        // Position de départ sur la table invisible au milieu
         makerPen.position.set(0, 2.2, -3);
         scene.add(makerPen);
 
-        // --- CONTROLES ET LOGIQUE DU JEU ---
+        // --- LOGIQUE LOGICIELLE ET MOTEUR ---
         const controls = new THREE.PointerLockControls(camera, document.body);
         const instructions = document.getElementById('instructions');
         const infoInteraction = document.getElementById('info-interaction');
@@ -129,8 +126,9 @@
         let canJump = false;
         let hasMakerPen = false;
         let menuOpen = false;
+        let currentTool = 'none'; // 'none', 'draw', 'delete'
 
-        // Écouteurs clavier
+        // Clavier
         document.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
             if(key === 'z' || e.code === 'KeyW') keys.z = true;
@@ -139,16 +137,10 @@
             if(key === 'd') keys.d = true;
             if(e.code === 'Space') keys.space = true;
             
-            // Ouvrir/Fermer le menu avec 'E'
             if(key === 'e' && hasMakerPen) {
                 menuOpen = !menuOpen;
-                if(menuOpen) {
-                    controls.unlock();
-                    makerMenu.style.display = 'flex';
-                } else {
-                    makerMenu.style.display = 'none';
-                    controls.lock();
-                }
+                if(menuOpen) { controls.unlock(); makerMenu.style.display = 'flex'; } 
+                else { makerMenu.style.display = 'none'; controls.lock(); }
             }
         });
 
@@ -161,31 +153,94 @@
             if(e.code === 'Space') keys.space = false;
         });
 
-        // --- SYSTÈME DE RAMASSAGE (CLIC) ---
+        // --- CONFIGURATION DES OUTILS (FONCTION INTERFACE) ---
+        window.setTool = function(tool) {
+            currentTool = tool;
+            document.getElementById('current-tool-txt').innerText = "Outil actuel : " + tool.toUpperCase();
+            
+            document.getElementById('btn-draw').classList.remove('active');
+            document.getElementById('btn-delete').classList.remove('active');
+            if(tool === 'draw') document.getElementById('btn-draw').classList.add('active');
+            if(tool === 'delete') document.getElementById('btn-delete').classList.add('active');
+
+            // Fermer le menu automatiquement pour pouvoir jouer
+            menuOpen = false;
+            makerMenu.style.display = 'none';
+            controls.lock();
+        }
+
+        // --- ACTIONS AU CLIC EN JEU (DESSINER / RAMASSER) ---
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2(0, 0);
 
-        document.addEventListener('click', () => {
-            if (!controls.isLocked || hasMakerPen) return;
+        document.addEventListener('pointerdown', (e) => {
+            if (!controls.isLocked) return;
 
+            // 1. Si on n'a pas le stylo, on essaie de le ramasser
+            if (!hasMakerPen) {
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(makerPen.children);
+                if (intersects.length > 0) {
+                    hasMakerPen = true;
+                    infoInteraction.style.display = 'none';
+                    scene.remove(makerPen);
+                    camera.add(makerPen);
+                    makerPen.position.set(0.35, -0.3, -0.6);
+                    makerPen.rotation.set(0.2, Math.PI + 0.3, 0); 
+                    setTool('draw'); // Activer le dessin de base
+                }
+                return;
+            }
+
+            // 2. Si on a le stylo, on gère les outils
             raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(makerPen.children);
 
-            if (intersects.length > 0) {
-                hasMakerPen = true;
-                infoInteraction.style.display = 'none';
-                
-                // AJOUTER À LA CAMÉRA (VUE MAIN / PREMIÈRE PERSONNE)
-                scene.remove(makerPen);
-                camera.add(makerPen);
-                
-                // Positionnement parfait dans la main droite à l'écran
-                makerPen.position.set(0.35, -0.3, -0.6);
-                makerPen.rotation.set(0.2, Math.PI + 0.3, 0); 
+            if (currentTool === 'draw') {
+                // On détecte où le viseur touche un élément (sol, mur ou autre cube)
+                const intersects = raycaster.intersectObjects(targetsClickables);
+                if (intersects.length > 0) {
+                    const intersect = intersects[0];
+                    
+                    // Création d'un cube orange de construction (Taille 1x1x1)
+                    const cubeGeo = new THREE.BoxGeometry(1, 1, 1);
+                    const cubeMat = new THREE.MeshStandardMaterial({ color: 0xffa500, roughness: 0.5 });
+                    const newCube = new THREE.Mesh(cubeGeo, cubeMat);
+
+                    // Calcule la position parfaite pour coller à la surface visée (grâce aux normales)
+                    const positionPositionnee = intersect.point.clone().add(intersect.face.normal.clone().multiplyScalar(0.5));
+                    
+                    // Aligner sur une grille imaginaire pour faire propre (comme Rec Room)
+                    newCube.position.set(
+                        Math.round(positionPositionnee.x),
+                        Math.round(positionPositionnee.y * 2) / 2, // Précision hauteur
+                        Math.round(positionPositionnee.z)
+                    );
+
+                    scene.add(newCube);
+                    targetsClickables.push(newCube); // On peut maintenant construire SUR ce nouveau cube
+                    cubesDessines.push(newCube);
+                }
+            } 
+            else if (currentTool === 'delete') {
+                // Supprime uniquement les cubes posés par le joueur
+                const intersects = raycaster.intersectObjects(cubesDessines);
+                if (intersects.length > 0) {
+                    const hitCube = intersects[0].object;
+                    
+                    // Retirer de la scène
+                    scene.remove(hitCube);
+                    
+                    // Nettoyer les listes
+                    const idx1 = targetsClickables.indexOf(hitCube);
+                    if(idx1 > -1) targetsClickables.splice(idx1, 1);
+                    
+                    const idx2 = cubesDessines.indexOf(hitCube);
+                    if(idx2 > -1) cubesDessines.splice(idx2, 1);
+                }
             }
         });
 
-        // --- BOUCLE D'ANIMATION ---
+        // --- BOUCLE PRINCIPALE ---
         const clock = new THREE.Clock();
 
         function animate() {
@@ -193,10 +248,10 @@
             const delta = clock.getDelta();
 
             if (controls.isLocked) {
-                // Physique mouvements
+                // Friction et Gravité
                 velocity.x -= velocity.x * 10.0 * delta;
                 velocity.z -= velocity.z * 10.0 * delta;
-                velocity.y -= 9.8 * 3.0 * delta; // Gravité
+                velocity.y -= 9.8 * 3.0 * delta;
 
                 direction.z = Number(keys.z) - Number(keys.s);
                 direction.x = Number(keys.d) - Number(keys.q);
@@ -208,7 +263,6 @@
                 controls.moveRight(-velocity.x * delta);
                 controls.moveForward(-velocity.z * delta);
 
-                // Saut et Sol
                 camera.position.y += velocity.y * delta;
                 if (camera.position.y < 3.0) {
                     velocity.y = 0;
@@ -220,13 +274,13 @@
                     canJump = false;
                 }
 
-                // Limites murs
+                // Limites de la pièce
                 if(camera.position.x > 14) camera.position.x = 14;
                 if(camera.position.x < -14) camera.position.x = -14;
                 if(camera.position.z > 14) camera.position.z = 14;
                 if(camera.position.z < -14) camera.position.z = -14;
 
-                // Affichage bulle info si on regarde le stylo au sol
+                // Afficher le message d'aide pour ramasser
                 if (!hasMakerPen) {
                     raycaster.setFromCamera(mouse, camera);
                     const intersects = raycaster.intersectObjects(makerPen.children);
@@ -238,7 +292,7 @@
                 }
             }
 
-            // Animation du stylo flottant au sol
+            // Flottaison du stylo s'il est au sol
             if (!hasMakerPen) {
                 makerPen.rotation.y += 0.015;
                 makerPen.position.y = 2.2 + Math.sin(clock.getElapsedTime() * 2.5) * 0.08;
