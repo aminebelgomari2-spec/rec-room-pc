@@ -2,28 +2,14 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Rec Room HTML - Watch Menu Update</title>
+    <title>Rec Room HTML - P2P Multiplayer</title>
     <style>
         body, html { margin: 0; padding: 0; overflow: hidden; width: 100%; height: 100%; font-family: Arial, sans-serif; user-select: none; }
         canvas { display: block; }
         #viseur { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: white; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; border: 1px solid black; }
         #instructions { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; background: rgba(0,0,0,0.85); padding: 25px; border-radius: 10px; text-align: center; cursor: pointer; z-index: 10; }
-        #info-interaction { position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); color: #ffeb3b; font-weight: bold; font-size: 18px; text-shadow: 1px 1px 3px black; display: none; pointer-events: none; }
         
-        /* MENU MAKER PEN (Touche E) */
-        #maker-menu { 
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            width: 500px; height: 320px; background: #2196F3; border: 6px solid #1976D2; 
-            border-radius: 15px; display: none; flex-direction: column; color: white; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 5; font-family: 'Arial Black', sans-serif;
-        }
-        .menu-header { background: #1565C0; padding: 10px; text-align: center; font-size: 18px; border-top-left-radius: 8px; border-top-right-radius: 8px; }
-        .menu-content { display: flex; flex-wrap: wrap; padding: 20px; justify-content: space-around; gap: 10px; }
-        .menu-btn { background: #ff9800; border: none; padding: 15px 20px; color: white; font-size: 14px; border-radius: 8px; cursor: pointer; transition: 0.1s; box-shadow: 0 4px #e65100; width: 140px; }
-        .menu-btn:active { transform: translateY(4px); box-shadow: none; }
-        .menu-btn.active { background: #4CAF50; box-shadow: 0 4px #388E3C; }
-
-        /* INTERFACE MONTRE INTERACTIVE (Touche Tab) */
+        /* MONTRE INTERACTIVE (REC ROOM WATCH) */
         #watch-ui {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 600px; height: 400px; background: #e0e0e0; border: 12px solid #424242;
@@ -32,79 +18,73 @@
         }
         #watch-sidebar { width: 150px; background: #ff5722; display: flex; flex-direction: column; padding: 10px; gap: 10px; }
         .watch-tab-btn { background: rgba(255,255,255,0.2); border: none; padding: 12px; color: white; font-weight: bold; border-radius: 8px; cursor: pointer; text-align: left; }
-        .watch-tab-btn:hover { background: rgba(255,255,255,0.4); }
         .watch-tab-btn.active { background: white; color: #ff5722; }
         #watch-main { flex: 1; padding: 20px; display: flex; flex-direction: column; background: #f5f5f5; }
         .watch-panel { display: none; flex-direction: column; gap: 15px; }
         .watch-panel.active { display: flex; }
         .watch-input { padding: 10px; border: 2px solid #ccc; border-radius: 8px; font-size: 16px; width: 80%; }
         .watch-action-btn { background: #00bcd4; color: white; border: none; padding: 12px; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px #0097a7; }
-        .watch-action-btn:active { transform: translateY(2px); box-shadow: none; }
 
-        #ui-montre-notif { position: absolute; bottom: 20px; left: 20px; background: rgba(0, 0, 0, 0.8); color: white; padding: 15px; border-radius: 10px; font-weight: bold; }
+        /* Menu Maker Pen */
+        #maker-menu { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 450px; height: 250px; background: #2196F3; border: 6px solid #1976D2; border-radius: 15px; display: none; flex-direction: column; color: white; z-index: 5; text-align: center;}
+        .menu-content { display: flex; padding: 20px; justify-content: space-around; }
+        .menu-btn { background: #ff9800; border: none; padding: 15px; color: white; font-size: 14px; border-radius: 8px; cursor: pointer; width: 120px; box-shadow: 0 4px #e65100;}
+        .menu-btn.active { background: #4CAF50; box-shadow: 0 4px #388E3C; }
+
+        #status-bar { position: absolute; bottom: 20px; left: 20px; background: rgba(0, 0, 0, 0.8); color: white; padding: 15px; border-radius: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div id="viseur"></div>
-    <div id="info-interaction">Clique pour ramasser le Maker Pen !</div>
     
     <div id="instructions">
         <h2>CLIQUE ICI POUR JOUER</h2>
-        <p><b>Z, Q, S, D</b> = Se déplacer | <b>Espace</b> = Sauter<br><b>E</b> = Palette Maker Pen | <b>Tab</b> = Ouvrir la Montre Interactive</p>
+        <p><b>Z, Q, S, D</b> = Se déplacer | <b>Espace</b> = Sauter<br><b>E</b> = Palette Maker Pen | <b>Tab</b> = Ouvrir la Montre (Multi P2P)</p>
     </div>
 
+    <!-- MENU PALETTE MAKER PEN -->
     <div id="maker-menu">
-        <div class="menu-header">📐 PALETTE DU MAKER PEN</div>
+        <h2 style="margin-top:15px;">📐 PALETTE MAKER PEN</h2>
         <div class="menu-content">
-            <button class="menu-btn" id="btn-draw" onclick="setTool('draw')">✏️ DESSINER</button>
-            <button class="menu-btn" id="btn-reshape" onclick="setTool('reshape')">📐 REMODELER</button>
+            <button class="menu-btn id="btn-draw" onclick="setTool('draw')">✏️ DESSINER</button>
             <button class="menu-btn" id="btn-delete" onclick="setTool('delete')">❌ SUPPRIMER</button>
         </div>
-        <div style="text-align:center; padding-top:20px; font-size:14px;" id="current-tool-txt">Outil actuel : Aucun</div>
-        <div style="text-align:center; padding-top:10px; font-size:12px;">Appuie sur 'E' pour fermer</div>
+        <div id="current-tool-txt">Outil actuel : Aucun</div>
     </div>
 
+    <!-- MONTRE INTERACTIVE MULTIJOUEUR -->
     <div id="watch-ui">
         <div id="watch-sidebar">
-            <div style="color: white; font-weight: bold; text-align: center; margin-bottom: 10px; font-size: 18px;">REC WATCH</div>
-            <button class="watch-tab-btn active" onclick="switchWatchTab('profile')">👤 PROFIL</button>
-            <button class="watch-tab-btn" onclick="switchWatchTab('play')">🎮 PLAY</button>
-            <button class="watch-tab-btn" onclick="switchWatchTab('room')">🏠 CHAMBRE</button>
+            <div style="color: white; font-weight: bold; text-align: center; margin-bottom: 10px;">REC WATCH</div>
+            <button class="watch-tab-btn active" onclick="switchWatchTab('multi')">🌐 MULTI P2P</button>
         </div>
         <div id="watch-main">
-            <div id="panel-profile" class="watch-panel active">
-                <h2>Mon Profil</h2>
-                <label>Modifier mon Pseudo :</label>
-                <input type="text" id="username-input" class="watch-input" value="RecPlayer" maxlength="15">
-                <button class="watch-action-btn" onclick="updateUsername()">Sauvegarder le Nom</button>
+            <div id="panel-multi" class="watch-panel active">
+                <h2>Mode Multijoueur P2P</h2>
+                <p><b>Étape 1 :</b> Initialise ta montre pour obtenir ton code.</p>
+                <button class="watch-action-btn" id="btn-init-p2p" onclick="initPeer()">Obtenir mon code de Chambre</button>
+                <h3 id="my-code-display" style="color: #ff5722;">Mon Code : En attente...</h3>
+                <hr style="width:100%">
+                <p><b>Étape 2 :</b> Rejoins un ami en collant son code ici :</p>
+                <input type="text" id="peer-id-input" class="watch-input" placeholder="Coller le code de l'ami...">
+                <button class="watch-action-btn" style="background:#4CAF50; box-shadow:0 4px #388E3C;" onclick="connectToPeer()">REJOINDRE LA CHAMBRE</button>
             </div>
-            <div id="panel-play" class="watch-panel">
-                <h2>Menu "Play"</h2>
-                <p>Voyager vers d'autres instances (Ambiance) :</p>
-                <button class="watch-action-btn" onclick="changeAmbiance(0x1a252f)">Chambre Par Défaut (Sombre)</button>
-                <button class="watch-action-btn" style="background:#87CEEB;" onclick="changeAmbiance(0x87CEEB)">Ambiance Jour (Bleu Ciel)</button>
-                <button class="watch-action-btn" style="background:#ff7675;" onclick="changeAmbiance(0x2d3436)">Mode Night Club (Noir Intense)</button>
-            </div>
-            <div id="panel-room" class="watch-panel">
-                <h2>Gestion de la Chambre</h2>
-                <p>Action sur l'espace actuel :</p>
-                <button class="watch-action-btn" style="background: #e74c3c; box-shadow: 0 4px #c0392b;" onclick="resetRoomCubes()">⚠️ EFFACER TOUTES LES CONSTRUCTIONS</button>
-            </div>
-            <div style="margin-top: auto; text-align: right; font-size: 12px; color: #777;">Appuie sur TAB pour fermer la montre</div>
+            <div style="margin-top: auto; text-align: right; font-size: 12px; color: #777;">Appuie sur TAB pour fermer</div>
         </div>
     </div>
     
-    <div id="ui-montre-notif">⌚ Joueur : <span id="watch-player-name">RecPlayer</span> | Appuie sur TAB pour la montre</div>
+    <div id="status-bar">🌐 Statut Multi : Solo | Appuie sur TAB</div>
 
+    <!-- SCRIPTS MOTEUR ET RESEAU -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
 
     <script>
-        // --- INITIALISATION SCÈNE ---
+        // --- 1. CONFIGURATION DU MONDE 3D ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x1a252f);
-        
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -112,58 +92,35 @@
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.7));
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
-        dirLight.position.set(10, 20, 10);
-        scene.add(dirLight);
+        dirLight.position.set(10, 20, 10); scene.add(dirLight);
 
-        const targetsClickables = []; 
-        const cubesDessines = [];
-
-        // Sol et Murs
-        const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: 0xe67e22, roughness: 0.8 }));
+        const targetsClickables = []; const cubesDessines = [];
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: 0xe67e22 }));
         floor.rotation.x = -Math.PI / 2; scene.add(floor); targetsClickables.push(floor);
 
-        const wallMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.9 });
-        const createWall = (w, h, d, x, y, z) => {
-            const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
-            wall.position.set(x, y, z); scene.add(wall); targetsClickables.push(wall);
-        };
-        createWall(30, 15, 1, 0, 7.5, -15);
-        createWall(1, 15, 30, -15, 7.5, 0);
-        createWall(1, 15, 30, 15, 7.5, 0);
-
-        // --- MAKER PEN ---
+        // --- MAKER PEN AUTOMATIQUE DANS LA MAIN ---
         const makerPen = new THREE.Group();
         const body = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.8, 16), new THREE.MeshStandardMaterial({ color: 0xdddddd }));
         body.rotation.x = Math.PI / 2; makerPen.add(body);
         const tip = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.3, 16), new THREE.MeshStandardMaterial({ color: 0xe67e22 }));
         tip.position.z = -0.55; tip.rotation.x = -Math.PI / 2; makerPen.add(tip);
-        const screen = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.05), new THREE.MeshStandardMaterial({ color: 0x34495e }));
-        screen.position.set(0, 0.08, 0.38); makerPen.add(screen);
-        makerPen.position.set(0, 2.2, -3); scene.add(makerPen);
+        camera.add(makerPen); scene.add(camera);
+        makerPen.position.set(0.35, -0.3, -0.6); makerPen.rotation.set(0.2, Math.PI + 0.3, 0); 
 
-        // --- CONTRÔLES ---
+        // --- 2. CONTROLES FPS ---
         const controls = new THREE.PointerLockControls(camera, document.body);
         const instructions = document.getElementById('instructions');
-        const infoInteraction = document.getElementById('info-interaction');
         const makerMenu = document.getElementById('maker-menu');
         const watchUi = document.getElementById('watch-ui');
 
-        instructions.addEventListener('click', () => { 
-            if(makerMenu.style.display !== 'flex' && watchUi.style.display !== 'flex') controls.lock(); 
-        });
-        controls.addEventListener('lock', () => instructions.style.display = 'none');
-        controls.addEventListener('unlock', () => { 
-            if(makerMenu.style.display !== 'flex' && watchUi.style.display !== 'flex') instructions.style.display = 'block'; 
-        });
-
+        instructions.addEventListener('click', () => { if(makerMenu.style.display !== 'flex' && watchUi.style.display !== 'flex') controls.lock(); });
         camera.position.set(0, 3, 5);
+
         const keys = { z: false, s: false, q: false, d: false, space: false };
         let velocity = new THREE.Vector3(); let direction = new THREE.Vector3();
-        let canJump = false; let hasMakerPen = false;
+        let canJump = false; let currentTool = 'draw';
         let menuOpen = false; let watchOpen = false;
-        let currentTool = 'none'; let blockSelectionne = null;
 
-        // Écoute Clavier complet
         document.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
             if(key === 'z' || e.code === 'KeyW') keys.z = true;
@@ -172,25 +129,16 @@
             if(key === 'd') keys.d = true;
             if(e.code === 'Space') keys.space = true;
             
-            // Touche E : Menu Maker Pen
-            if(key === 'e' && hasMakerPen && !watchOpen) {
+            if(key === 'e' && !watchOpen) {
                 menuOpen = !menuOpen;
                 if(menuOpen) { controls.unlock(); makerMenu.style.display = 'flex'; } 
                 else { makerMenu.style.display = 'none'; controls.lock(); }
             }
-
-            // Touche TAB : Ouvrir/Fermer la montre interactive
             if(e.code === 'Tab') {
-                e.preventDefault(); // Évite de changer de focus dans le navigateur
-                if(menuOpen) return; // Priorité à la palette fermée
+                e.preventDefault(); if(menuOpen) return;
                 watchOpen = !watchOpen;
-                if(watchOpen) {
-                    controls.unlock();
-                    watchUi.style.display = 'flex';
-                } else {
-                    watchUi.style.display = 'none';
-                    controls.lock();
-                }
+                if(watchOpen) { controls.unlock(); watchUi.style.display = 'flex'; } 
+                else { watchUi.style.display = 'none'; controls.lock(); }
             }
         });
 
@@ -203,112 +151,138 @@
             if(e.code === 'Space') keys.space = false;
         });
 
-        // --- INTERFACE FONCTIONS MAKER PEN ---
         window.setTool = function(tool) {
             currentTool = tool;
             document.getElementById('current-tool-txt').innerText = "Outil actuel : " + tool.toUpperCase();
-            document.getElementById('btn-draw').classList.remove('active');
-            document.getElementById('btn-reshape').classList.remove('active');
-            document.getElementById('btn-delete').classList.remove('active');
-            if(tool === 'draw') document.getElementById('btn-draw').classList.add('active');
-            if(tool === 'reshape') document.getElementById('btn-reshape').classList.add('active');
-            if(tool === 'delete') document.getElementById('btn-delete').classList.add('active');
             menuOpen = false; makerMenu.style.display = 'none'; controls.lock();
         }
 
-        // --- INTERFACE FONCTIONS MONTRE ---
-        window.switchWatchTab = function(tabName) {
-            // Gérer l'état actif des boutons latéraux
-            const buttons = document.querySelectorAll('.watch-tab-btn');
-            buttons.forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+        // --- 3. LOGIQUE RESEAU P2P DANS LE NAVIGATEUR (WebRTC) ---
+        let peer = null;
+        let conn = null;
+        let remotePlayerMesh = null; // Avatar de l'autre joueur
 
-            // Gérer l'affichage des panels
-            const panels = document.querySelectorAll('.watch-panel');
-            panels.forEach(p => p.classList.remove('active'));
-            document.getElementById('panel-' + tabName).classList.add('active');
+        // Étape 1 : Activer le système P2P du navigateur
+        window.initPeer = function() {
+            document.getElementById('btn-init-p2p').innerText = "Génération...";
+            // On utilise le serveur cloud public de PeerJS uniquement pour la mise en relation
+            peer = new Peer(); 
+
+            peer.on('open', (id) => {
+                document.getElementById('my-code-display').innerText = "Mon Code : " + id;
+                document.getElementById('status-bar').innerText = "🌐 En attente d'un ami...";
+                document.getElementById('btn-init-p2p').style.display = 'none';
+            });
+
+            // Si quelqu'un d'autre se connecte à notre code
+            peer.on('connection', (connection) => {
+                conn = connection;
+                setupConnectionHandlers();
+            });
         }
 
-        window.updateUsername = function() {
-            const nuevoName = document.getElementById('username-input').value;
-            if(nuevoName.trim() !== "") {
-                document.getElementById('watch-player-name').innerText = nuevoName;
-                alert("Pseudo mis à jour : " + nuevoName);
+        // Étape 2 : Se connecter au code de l'autre joueur
+        window.connectToPeer = function() {
+            const remoteId = document.getElementById('peer-id-input').value.trim();
+            if(!peer) peer = new Peer(); // S'assurer que Peer est créé
+            
+            peer.on('open', () => {
+                conn = peer.connect(remoteId);
+                setupConnectionHandlers();
+            });
+        }
+
+        // Configuration de l'échange de données en direct (P2P pur après connexion)
+        function setupConnectionHandlers() {
+            document.getElementById('status-bar').innerText = "🌐 CONNECTÉ EN MULTIJOUEUR !";
+            watchOpen = false; watchUi.style.display = 'none'; controls.lock();
+
+            // Création graphique de l'avatar de l'autre joueur (Capsule)
+            const avatarGeo = new THREE.CylinderGeometry(0.4, 0.4, 2, 16);
+            const avatarMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+            remotePlayerMesh = new THREE.Mesh(avatarGeo, avatarMat);
+            scene.add(remotePlayerMesh);
+
+            // Écouter les actions envoyées par l'autre PC
+            conn.on('data', (data) => {
+                if (data.type === 'move') {
+                    // Met à jour la position de l'ami en continu
+                    remotePlayerMesh.position.set(data.x, data.y - 1, data.z);
+                }
+                else if (data.type === 'build') {
+                    // Ajoute le bloc que l'autre vient de dessiner
+                    createCubeGraphics(data.x, data.y, data.z);
+                }
+                else if (data.type === 'delete') {
+                    // Supprime le bloc enlevé par l'autre
+                    removeCubeGraphics(data.x, data.y, data.z);
+                }
+            });
+        }
+
+        // Envoi d'une info à l'autre PC
+        function sendNetworkData(dataObj) {
+            if (conn && conn.open) {
+                conn.send(dataObj);
             }
         }
 
-        window.changeAmbiance = function(colorHex) {
-            scene.background.setHex(colorHex);
-        }
-
-        window.resetRoomCubes = function() {
-            if(confirm("Voulez-vous vraiment détruire TOUS vos blocs dessinés ?")) {
-                cubesDessines.forEach(cube => {
-                    scene.remove(cube);
-                    const idx = targetsClickables.indexOf(cube);
-                    if(idx > -1) targetsClickables.splice(idx, 1);
-                });
-                cubesDessines.length = 0; // Vider le tableau
-                alert("Chambre réinitialisée !");
-            }
-        }
-
-        // --- RAYCASTER / CLICS ---
+        // --- 4. ENGINE DE CONSTRUCTION SYNCHRONISÉ ---
         const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2(0, 0);
 
         document.addEventListener('pointerdown', () => {
             if (!controls.isLocked) return;
-
-            if (!hasMakerPen) {
-                raycaster.setFromCamera(mouse, camera);
-                const intersects = raycaster.intersectObjects(makerPen.children);
-                if (intersects.length > 0) {
-                    hasMakerPen = true;
-                    infoInteraction.style.display = 'none';
-                    scene.remove(makerPen); camera.add(makerPen);
-                    makerPen.position.set(0.35, -0.3, -0.6); makerPen.rotation.set(0.2, Math.PI + 0.3, 0); 
-                    setTool('draw');
-                }
-                return;
-            }
-
             raycaster.setFromCamera(mouse, camera);
 
             if (currentTool === 'draw') {
                 const intersects = raycaster.intersectObjects(targetsClickables);
                 if (intersects.length > 0) {
                     const intersect = intersects[0];
-                    const cubeGeo = new THREE.BoxGeometry(1, 1, 1);
-                    const cubeMat = new THREE.MeshStandardMaterial({ color: 0xffa500, roughness: 0.5 });
-                    const newCube = new THREE.Mesh(cubeGeo, cubeMat);
                     const pos = intersect.point.clone().add(intersect.face.normal.clone().multiplyScalar(0.5));
-                    newCube.position.set(Math.round(pos.x), Math.round(pos.y * 2) / 2, Math.round(pos.z));
-                    scene.add(newCube); targetsClickables.push(newCube); cubesDessines.push(newCube);
+                    const gridX = Math.round(pos.x); const gridY = Math.round(pos.y * 2) / 2; const gridZ = Math.round(pos.z);
+                    
+                    createCubeGraphics(gridX, gridY, gridZ);
+                    // On avertit le pote qu'on a posé un bloc
+                    sendNetworkData({ type: 'build', x: gridX, y: gridY, z: gridZ });
                 }
-            } else if (currentTool === 'reshape') {
-                const intersects = raycaster.intersectObjects(cubesDessines);
-                if (intersects.length > 0) { blockSelectionne = intersects[0].object; blockSelectionne.material.color.setHex(0x4CAF50); }
-            } else if (currentTool === 'delete') {
+            } 
+            else if (currentTool === 'delete') {
                 const intersects = raycaster.intersectObjects(cubesDessines);
                 if (intersects.length > 0) {
-                    const hitCube = intersects[0].object; scene.remove(hitCube);
-                    const idx1 = targetsClickables.indexOf(hitCube); if(idx1 > -1) targetsClickables.splice(idx1, 1);
-                    const idx2 = cubesDessines.indexOf(hitCube); if(idx2 > -1) cubesDessines.splice(idx2, 1);
+                    const hitCube = intersects[0].object;
+                    const cX = hitCube.position.x; const cY = hitCube.position.y; const cZ = hitCube.position.z;
+                    
+                    removeCubeGraphics(cX, cY, cZ);
+                    // On avertit le pote qu'on a supprimé ce bloc
+                    sendNetworkData({ type: 'delete', x: cX, y: cY, z: cZ });
                 }
             }
         });
 
-        document.addEventListener('pointerup', () => { if (blockSelectionne) { blockSelectionne.material.color.setHex(0xffa500); blockSelectionne = null; } });
-        document.addEventListener('wheel', (e) => {
-            if (controls.isLocked && currentTool === 'reshape' && blockSelectionne) {
-                const change = e.deltaY < 0 ? 0.1 : -0.1;
-                blockSelectionne.scale.x += change; blockSelectionne.scale.y += change; blockSelectionne.scale.z += change;
-                if (blockSelectionne.scale.x < 0.2) blockSelectionne.scale.set(0.2, 0.2, 0.2);
-            }
-        });
+        function createCubeGraphics(x, y, z) {
+            const cubeGeo = new THREE.BoxGeometry(1, 1, 1);
+            const cubeMat = new THREE.MeshStandardMaterial({ color: 0xffa500 });
+            const newCube = new THREE.Mesh(cubeGeo, cubeMat);
+            newCube.position.set(x, y, z);
+            scene.add(newCube);
+            targetsClickables.push(newCube);
+            cubesDessines.push(newCube);
+        }
 
-        // --- LOOP GAME ---
+        function removeCubeGraphics(x, y, z) {
+            // Trouver le cube correspondant aux coordonnées précises
+            const hitCube = cubesDessines.find(c => c.position.x === x && c.position.y === y && c.position.z === z);
+            if (hitCube) {
+                scene.remove(hitCube);
+                const idx1 = targetsClickables.indexOf(hitCube); if(idx1 > -1) targetsClickables.splice(idx1, 1);
+                const idx2 = cubesDessines.indexOf(hitCube); if(idx2 > -1) cubesDessines.splice(idx2, 1);
+            }
+        }
+
+        // --- 5. LOOP DE RENDER ET TRANSMISSION POSITION ---
         const clock = new THREE.Clock();
+        let lastSendTime = 0;
+
         function animate() {
             requestAnimationFrame(animate); const delta = clock.getDelta();
 
@@ -324,18 +298,16 @@
                 if (camera.position.y < 3.0) { velocity.y = 0; camera.position.y = 3.0; canJump = true; }
                 if (keys.space && canJump) { velocity.y += 11.0; canJump = false; }
 
+                // Limites murs
                 if(camera.position.x > 14) camera.position.x = 14; if(camera.position.x < -14) camera.position.x = -14;
                 if(camera.position.z > 14) camera.position.z = 14; if(camera.position.z < -14) camera.position.z = -14;
 
-                if (!hasMakerPen) {
-                    raycaster.setFromCamera(mouse, camera); const intersects = raycaster.intersectObjects(makerPen.children);
-                    if (intersects.length > 0 && camera.position.distanceTo(makerPen.position) < 7) infoInteraction.style.display = 'block';
-                    else infoInteraction.style.display = 'none';
+                // Envoyer la position au pote en direct à intervalles réguliers (tick rate réseau)
+                const now = performance.now();
+                if (now - lastSendTime > 40) { // Environ 25 fois par seconde
+                    sendNetworkData({ type: 'move', x: camera.position.x, y: camera.position.y, z: camera.position.z });
+                    lastSendTime = now;
                 }
-            }
-
-            if (!hasMakerPen) {
-                makerPen.rotation.y += 0.015; makerPen.position.y = 2.2 + Math.sin(clock.getElapsedTime() * 2.5) * 0.08;
             }
             renderer.render(scene, camera);
         }
