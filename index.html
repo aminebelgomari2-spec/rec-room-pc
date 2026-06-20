@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Rec Room HTML - Maker Pen System</title>
+    <title>Rec Room HTML - Maker Pen Advanced Tools</title>
     <style>
         body, html { margin: 0; padding: 0; overflow: hidden; width: 100%; height: 100%; font-family: Arial, sans-serif; user-select: none; }
         canvas { display: block; }
@@ -10,16 +10,16 @@
         #instructions { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; background: rgba(0,0,0,0.85); padding: 25px; border-radius: 10px; text-align: center; cursor: pointer; z-index: 10; }
         #info-interaction { position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); color: #ffeb3b; font-weight: bold; font-size: 18px; text-shadow: 1px 1px 3px black; display: none; pointer-events: none; }
         
-        /* Menu Maker Pen Style Rec Room */
+        /* Menu Maker Pen */
         #maker-menu { 
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            width: 450px; height: 300px; background: #2196F3; border: 6px solid #1976D2; 
+            width: 500px; height: 320px; background: #2196F3; border: 6px solid #1976D2; 
             border-radius: 15px; display: none; flex-direction: column; color: white; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 5; font-family: 'Arial Black', sans-serif;
         }
         .menu-header { background: #1565C0; padding: 10px; text-align: center; font-size: 18px; border-top-left-radius: 8px; border-top-right-radius: 8px; }
         .menu-content { display: flex; flex-wrap: wrap; padding: 20px; justify-content: space-around; gap: 10px; }
-        .menu-btn { background: #ff9800; border: none; padding: 15px 25px; color: white; font-size: 16px; border-radius: 8px; cursor: pointer; transition: 0.1s; box-shadow: 0 4px #e65100; width: 180px; }
+        .menu-btn { background: #ff9800; border: none; padding: 15px 20px; color: white; font-size: 14px; border-radius: 8px; cursor: pointer; transition: 0.1s; box-shadow: 0 4px #e65100; width: 140px; }
         .menu-btn:active { transform: translateY(4px); box-shadow: none; }
         .menu-btn.active { background: #4CAF50; box-shadow: 0 4px #388E3C; }
         
@@ -33,27 +33,27 @@
     
     <div id="instructions">
         <h2>CLIQUE ICI POUR JOUER</h2>
-        <p><b>Z, Q, S, D</b> = Se déplacer | <b>Espace</b> = Sauter<br><b>E</b> = Menu du Maker Pen<br><b>Clic gauche</b> = Utiliser l'outil actif</p>
+        <p><b>Z, Q, S, D</b> = Se déplacer | <b>Espace</b> = Sauter<br><b>E</b> = Menu du Maker Pen<br><b>Remodeler</b> = Rester appuyé sur le bloc + Molette souris</p>
     </div>
 
-    <!-- Interface Maker Pen -->
     <div id="maker-menu">
         <div class="menu-header">📐 PALETTE DU MAKER PEN</div>
         <div class="menu-content">
             <button class="menu-btn" id="btn-draw" onclick="setTool('draw')">✏️ DESSINER</button>
+            <button class="menu-btn" id="btn-reshape" onclick="setTool('reshape')">📐 REMODELER</button>
             <button class="menu-btn" id="btn-delete" onclick="setTool('delete')">❌ SUPPRIMER</button>
         </div>
         <div style="text-align:center; padding-top:20px; font-size:14px;" id="current-tool-txt">Outil actuel : Aucun</div>
         <div style="text-align:center; padding-top:10px; font-size:12px;">Appuie sur 'E' pour fermer</div>
     </div>
     
-    <div id="ui-montre">⌚ Rec Room v0.4 | Mode Création</div>
+    <div id="ui-montre">⌚ Rec Room v0.5 | Outil Remodeler Intégré</div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
 
     <script>
-        // --- INITIALISATION DE LA SCÈNE ---
+        // --- INITIALISATION SCÈNE ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x1a252f);
         
@@ -62,17 +62,15 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // Lumières
         scene.add(new THREE.AmbientLight(0xffffff, 0.7));
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
         dirLight.position.set(10, 20, 10);
         scene.add(dirLight);
 
-        // Listes pour les collisions et interactions
         const targetsClickables = []; 
         const cubesDessines = [];
 
-        // Sol (Ajouté à la liste des cibles sur lesquelles on peut dessiner)
+        // Sol
         const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: 0xe67e22, roughness: 0.8 }));
         floor.rotation.x = -Math.PI / 2;
         scene.add(floor);
@@ -90,12 +88,6 @@
         createWall(1, 15, 30, -15, 7.5, 0);
         createWall(1, 15, 30, 15, 7.5, 0);
 
-        // Lit
-        const bed = new THREE.Mesh(new THREE.BoxGeometry(4, 1.5, 6), new THREE.MeshStandardMaterial({ color: 0x2980b9 }));
-        bed.position.set(-11, 0.75, -11);
-        scene.add(bed);
-        targetsClickables.push(bed);
-
         // --- MAKER PEN ---
         const makerPen = new THREE.Group();
         const body = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.8, 16), new THREE.MeshStandardMaterial({ color: 0xdddddd }));
@@ -108,7 +100,7 @@
         makerPen.position.set(0, 2.2, -3);
         scene.add(makerPen);
 
-        // --- LOGIQUE LOGICIELLE ET MOTEUR ---
+        // --- INTERFACES ET LOGIQUE ---
         const controls = new THREE.PointerLockControls(camera, document.body);
         const instructions = document.getElementById('instructions');
         const infoInteraction = document.getElementById('info-interaction');
@@ -126,9 +118,11 @@
         let canJump = false;
         let hasMakerPen = false;
         let menuOpen = false;
-        let currentTool = 'none'; // 'none', 'draw', 'delete'
+        let currentTool = 'none';
 
-        // Clavier
+        // Variables de remodelage
+        let blockSelectionne = null;
+
         document.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
             if(key === 'z' || e.code === 'KeyW') keys.z = true;
@@ -153,30 +147,31 @@
             if(e.code === 'Space') keys.space = false;
         });
 
-        // --- CONFIGURATION DES OUTILS (FONCTION INTERFACE) ---
         window.setTool = function(tool) {
             currentTool = tool;
             document.getElementById('current-tool-txt').innerText = "Outil actuel : " + tool.toUpperCase();
             
             document.getElementById('btn-draw').classList.remove('active');
+            document.getElementById('btn-reshape').classList.remove('active');
             document.getElementById('btn-delete').classList.remove('active');
             if(tool === 'draw') document.getElementById('btn-draw').classList.add('active');
+            if(tool === 'reshape') document.getElementById('btn-reshape').classList.add('active');
             if(tool === 'delete') document.getElementById('btn-delete').classList.add('active');
 
-            // Fermer le menu automatiquement pour pouvoir jouer
             menuOpen = false;
             makerMenu.style.display = 'none';
             controls.lock();
         }
 
-        // --- ACTIONS AU CLIC EN JEU (DESSINER / RAMASSER) ---
+        // --- REYCASTER ET CLICS ---
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2(0, 0);
 
+        // Appui clic souris
         document.addEventListener('pointerdown', (e) => {
             if (!controls.isLocked) return;
 
-            // 1. Si on n'a pas le stylo, on essaie de le ramasser
+            // Ramasser le stylo
             if (!hasMakerPen) {
                 raycaster.setFromCamera(mouse, camera);
                 const intersects = raycaster.intersectObjects(makerPen.children);
@@ -187,60 +182,79 @@
                     camera.add(makerPen);
                     makerPen.position.set(0.35, -0.3, -0.6);
                     makerPen.rotation.set(0.2, Math.PI + 0.3, 0); 
-                    setTool('draw'); // Activer le dessin de base
+                    setTool('draw');
                 }
                 return;
             }
 
-            // 2. Si on a le stylo, on gère les outils
             raycaster.setFromCamera(mouse, camera);
 
+            // Mode DESSINER
             if (currentTool === 'draw') {
-                // On détecte où le viseur touche un élément (sol, mur ou autre cube)
                 const intersects = raycaster.intersectObjects(targetsClickables);
                 if (intersects.length > 0) {
                     const intersect = intersects[0];
-                    
-                    // Création d'un cube orange de construction (Taille 1x1x1)
                     const cubeGeo = new THREE.BoxGeometry(1, 1, 1);
                     const cubeMat = new THREE.MeshStandardMaterial({ color: 0xffa500, roughness: 0.5 });
                     const newCube = new THREE.Mesh(cubeGeo, cubeMat);
 
-                    // Calcule la position parfaite pour coller à la surface visée (grâce aux normales)
                     const positionPositionnee = intersect.point.clone().add(intersect.face.normal.clone().multiplyScalar(0.5));
-                    
-                    // Aligner sur une grille imaginaire pour faire propre (comme Rec Room)
-                    newCube.position.set(
-                        Math.round(positionPositionnee.x),
-                        Math.round(positionPositionnee.y * 2) / 2, // Précision hauteur
-                        Math.round(positionPositionnee.z)
-                    );
+                    newCube.position.set(Math.round(positionPositionnee.x), Math.round(positionPositionnee.y * 2) / 2, Math.round(positionPositionnee.z));
 
                     scene.add(newCube);
-                    targetsClickables.push(newCube); // On peut maintenant construire SUR ce nouveau cube
+                    targetsClickables.push(newCube);
                     cubesDessines.push(newCube);
                 }
             } 
+            // Mode REMODELER (Sélection du bloc)
+            else if (currentTool === 'reshape') {
+                const intersects = raycaster.intersectObjects(cubesDessines);
+                if (intersects.length > 0) {
+                    blockSelectionne = intersects[0].object;
+                    // Change de couleur temporairement pour indiquer la sélection (Vert)
+                    blockSelectionne.material.color.setHex(0x4CAF50);
+                }
+            }
+            // Mode SUPPRIMER
             else if (currentTool === 'delete') {
-                // Supprime uniquement les cubes posés par le joueur
                 const intersects = raycaster.intersectObjects(cubesDessines);
                 if (intersects.length > 0) {
                     const hitCube = intersects[0].object;
-                    
-                    // Retirer de la scène
                     scene.remove(hitCube);
-                    
-                    // Nettoyer les listes
-                    const idx1 = targetsClickables.indexOf(hitCube);
-                    if(idx1 > -1) targetsClickables.splice(idx1, 1);
-                    
-                    const idx2 = cubesDessines.indexOf(hitCube);
-                    if(idx2 > -1) cubesDessines.splice(idx2, 1);
+                    const idx1 = targetsClickables.indexOf(hitCube); if(idx1 > -1) targetsClickables.splice(idx1, 1);
+                    const idx2 = cubesDessines.indexOf(hitCube); if(idx2 > -1) cubesDessines.splice(idx2, 1);
                 }
             }
         });
 
-        // --- BOUCLE PRINCIPALE ---
+        // Relâchement du clic souris
+        document.addEventListener('pointerup', () => {
+            // Si on remodelait un bloc, on lui remet sa couleur orange d'origine
+            if (blockSelectionne) {
+                blockSelectionne.material.color.setHex(0xffa500);
+                blockSelectionne = null;
+            }
+        });
+
+        // Événement Molette de souris pour redimensionner le bloc sélectionné
+        document.addEventListener('wheel', (e) => {
+            if (controls.isLocked && currentTool === 'reshape' && blockSelectionne) {
+                // Déterminer la direction du zoom/scroll
+                const changementTaille = e.deltaY < 0 ? 0.1 : -0.1;
+                
+                // Appliquer le redimensionnement de manière uniforme sur les 3 axes
+                blockSelectionne.scale.x += changementTaille;
+                blockSelectionne.scale.y += changementTaille;
+                blockSelectionne.scale.z += changementTaille;
+
+                // Bloquer une taille minimale pour éviter que le bloc ne disparaisse ou s'inverse
+                if (blockSelectionne.scale.x < 0.2) {
+                    blockSelectionne.scale.set(0.2, 0.2, 0.2);
+                }
+            }
+        });
+
+        // --- BOUCLE DE MISE À JOUR ---
         const clock = new THREE.Clock();
 
         function animate() {
@@ -248,7 +262,6 @@
             const delta = clock.getDelta();
 
             if (controls.isLocked) {
-                // Friction et Gravité
                 velocity.x -= velocity.x * 10.0 * delta;
                 velocity.z -= velocity.z * 10.0 * delta;
                 velocity.y -= 9.8 * 3.0 * delta;
@@ -274,13 +287,11 @@
                     canJump = false;
                 }
 
-                // Limites de la pièce
                 if(camera.position.x > 14) camera.position.x = 14;
                 if(camera.position.x < -14) camera.position.x = -14;
                 if(camera.position.z > 14) camera.position.z = 14;
                 if(camera.position.z < -14) camera.position.z = -14;
 
-                // Afficher le message d'aide pour ramasser
                 if (!hasMakerPen) {
                     raycaster.setFromCamera(mouse, camera);
                     const intersects = raycaster.intersectObjects(makerPen.children);
@@ -292,7 +303,6 @@
                 }
             }
 
-            // Flottaison du stylo s'il est au sol
             if (!hasMakerPen) {
                 makerPen.rotation.y += 0.015;
                 makerPen.position.y = 2.2 + Math.sin(clock.getElapsedTime() * 2.5) * 0.08;
