@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Rec Room HTML - Ultra P2P, Basket & Chat Engine</title>
+    <title>Rec Room HTML - Mega Update: Shooting Range, Inventory & PvP Engine</title>
     <style>
         body, html { margin: 0; padding: 0; overflow: hidden; width: 100%; height: 100%; font-family: Arial, sans-serif; user-select: none; }
         canvas { display: block; }
@@ -10,9 +10,9 @@
         #instructions { position: absolute; top: 0; left: 0; width: 100%; height: 100%; color: white; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; cursor: pointer; z-index: 10; }
         #info-interaction { position: absolute; top: 60%; left: 50%; transform: translate(-50%, -50%); color: #ffeb3b; font-weight: bold; font-size: 18px; text-shadow: 1px 1px 3px black; display: none; pointer-events: none; }
         
-        /* TABLEAU DES SCORES */
-        #scoreboard { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: #333; border: 4px solid #ff5722; color: #fff; padding: 10px 30px; border-radius: 10px; font-size: 24px; font-weight: bold; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.5); pointer-events: none; z-index: 2; }
-        .score-num { color: #00bcd4; font-size: 32px; }
+        /* TABLEAU DES SCORES MULTI-RECORDS */
+        #scoreboard { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: #333; border: 4px solid #ff5722; color: #fff; padding: 10px 25px; border-radius: 10px; font-size: 18px; font-weight: bold; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.5); pointer-events: none; z-index: 2; display: flex; gap: 20px; }
+        .score-num { color: #00bcd4; font-size: 22px; }
 
         /* INTERFACE DU CHAT TEXTUEL */
         #chat-container { position: absolute; bottom: 80px; left: 20px; width: 350px; height: 220px; background: rgba(0, 0, 0, 0.6); border-radius: 8px; display: flex; flex-direction: column; padding: 10px; box-sizing: border-box; pointer-events: none; z-index: 8; border: 1px solid rgba(255,255,255,0.1); }
@@ -22,6 +22,7 @@
         .chat-system { color: #ffeb3b; font-weight: bold; }
         .chat-me { color: #00ffc4; font-weight: bold; }
         .chat-peer { color: #3498db; font-weight: bold; }
+        .chat-combat { color: #e74c3c; font-weight: bold; }
 
         /* WATCH UI (TAB) */
         #watch-ui { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 450px; height: 350px; background: #e0e0e0; border: 10px solid #424242; border-radius: 20px; display: none; flex-direction: column; padding: 20px; z-index: 6; gap: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); color: #333; }
@@ -45,7 +46,11 @@
     <div id="info-interaction">Clique pour agir !</div>
     <div id="nametag">Player</div>
     
-    <div id="scoreboard">🏀 SCORE BASKET : <span id="score-val" class="score-num">0</span></div>
+    <div id="scoreboard">
+        <div>🏀 BASKET : <span id="score-val" class="score-num">0</span></div>
+        <div>🎯 CIBLES : <span id="score-targets" class="score-num">0</span></div>
+        <div>⚔️ PVP HIT : <span id="score-pvp" class="score-num">0</span></div>
+    </div>
     
     <div id="chat-container">
         <div id="chat-area">
@@ -56,7 +61,7 @@
 
     <div id="instructions">
         <h2>CLIQUE ICI POUR JOUER</h2>
-        <p><b>Z, Q, S, D</b> = Se déplacer | <b>Espace</b> = Sauter<br><b>E</b> = Palette Maker Pen | <b>Tab</b> = Ouvrir la Montre<br><b>Touche [ = ]</b> = Ouvrir/Fermer le Chat | <b>Entrée</b> = Envoyer le message</p>
+        <p><b>Z, Q, S, D</b> = Se déplacer | <b>Espace</b> = Sauter<br><b>E</b> = Palette Maker Pen | <b>Tab</b> = Ouvrir la Montre<br><b>Touche [ = ]</b> = Ouvrir/Fermer le Chat | <b>Clic Gauche</b> = Utiliser l'objet tenu</p>
     </div>
 
     <div id="maker-menu">
@@ -102,14 +107,26 @@
 
         const targetsClickables = []; 
         const cubesDessines = [];
-        
-        // Sol
-        const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: 0xe67e22, roughness: 0.8 }));
+        const targetsStandTir = []; // Liste des cibles du stand de tir
+
+        // --- SALLE UNIQUE ET EXTENSION STAND DE TIR ---
+        const floorMat1 = new THREE.MeshStandardMaterial({ color: 0xe67e22, roughness: 0.8 }); // Principal
+        const floorMat2 = new THREE.MeshStandardMaterial({ color: 0x34495e, roughness: 0.7 }); // Stand de tir
+
+        // Sol Principal (Chambre)
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), floorMat1);
         floor.rotation.x = -Math.PI / 2; 
         scene.add(floor); 
         targetsClickables.push(floor);
 
-        // Murs de la pièce
+        // Sol Stand de Tir (Décalé vers la droite x=30, z=0)
+        const floorShootingRange = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), floorMat2);
+        floorShootingRange.position.set(30, 0, 0);
+        floorShootingRange.rotation.x = -Math.PI / 2;
+        scene.add(floorShootingRange);
+        targetsClickables.push(floorShootingRange);
+
+        // Construction des Murs Externes & Cloisons
         const wallMat = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.9 });
         const createWall = (w, h, d, x, y, z) => {
             const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
@@ -117,9 +134,31 @@
             scene.add(wall); 
             targetsClickables.push(wall);
         };
+        // Chambre Principale Murs
         createWall(30, 15, 1, 0, 7.5, -15); 
         createWall(1, 15, 30, -15, 7.5, 0); 
-        createWall(1, 15, 30, 15, 7.5, 0);
+        // Cloison de séparation avec porte (x=15)
+        createWall(1, 15, 10, 15, 7.5, -10);
+        createWall(1, 15, 10, 15, 7.5, 10);
+        // Extension Stand de Tir Murs
+        createWall(30, 15, 1, 30, 7.5, -15);
+        createWall(30, 15, 1, 30, 7.5, 15);
+        createWall(1, 15, 30, 45, 7.5, 0);
+        // Fermeture arrière chambre
+        createWall(30, 15, 1, 0, 7.5, 15);
+
+        // --- CIBLES DU STAND DE TIR ---
+        const createTargetEntity = (x, y, z) => {
+            const tgtGeo = new THREE.BoxGeometry(1.5, 1.5, 0.2);
+            const tgtMat = new THREE.MeshStandardMaterial({ color: 0xc0392b, emissive: 0x550000 });
+            const mesh = new THREE.Mesh(tgtGeo, tgtMat);
+            mesh.position.set(x, y, z);
+            scene.add(mesh);
+            targetsStandTir.push(mesh);
+        };
+        createTargetEntity(44, 5, -8);
+        createTargetEntity(44, 7, 0);
+        createTargetEntity(44, 4, 8);
 
         // --- PANNEAU DE BASKET ---
         const basketGroup = new THREE.Group();
@@ -140,20 +179,27 @@
         scene.add(basketBall);
 
         let ballVelocity = new THREE.Vector3(0, 0, 0);
-        let globalScore = 0; 
+        let globalScore = 0; let targetScore = 0; let pvpScore = 0;
         let canScore = true;
 
-        // --- MAKER PEN AU SOL ---
+        // --- ENGINES D'EQUIPEMENT (MAKER PEN & PISTOLET LASER) ---
+        // Maker Pen Mesh au sol initial
         const makerPen = new THREE.Group();
-        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.8, 16), new THREE.MeshStandardMaterial({ color: 0xdddddd })); 
-        body.rotation.x = Math.PI / 2; 
-        makerPen.add(body);
-        const tip = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.3, 16), new THREE.MeshStandardMaterial({ color: 0xe67e22 })); 
-        tip.position.z = -0.55; 
-        tip.rotation.x = -Math.PI / 2; 
-        makerPen.add(tip);
+        const mpBody = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.8, 16), new THREE.MeshStandardMaterial({ color: 0xdddddd })); mpBody.rotation.x = Math.PI / 2; makerPen.add(mpBody);
+        const mpTip = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.3, 16), new THREE.MeshStandardMaterial({ color: 0xe67e22 })); mpTip.position.z = -0.55; mpTip.rotation.x = -Math.PI / 2; makerPen.add(mpTip);
         makerPen.position.set(-2, 2.2, -3); 
         scene.add(makerPen);
+
+        // Laser Pistol Mesh au sol initial (Dans le Stand de Tir !)
+        const laserPistol = new THREE.Group();
+        const gunBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.6, 16), new THREE.MeshStandardMaterial({ color: 0x3498db })); gunBarrel.rotation.x = Math.PI / 2; laserPistol.add(gunBarrel);
+        const gunGrip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.25, 0.1), new THREE.MeshStandardMaterial({ color: 0x2c3e50 })); gunGrip.position.set(0, -0.2, 0.2); gunGrip.rotation.x = 0.3; laserPistol.add(gunGrip);
+        laserPistol.position.set(25, 1.2, 0);
+        scene.add(laserPistol);
+
+        // États des équipements possédés
+        let hasMakerPen = false; 
+        let hasLaserPistol = false;
 
         // --- 2. CONTROLES FPS & INTERACTION ---
         const controls = new THREE.PointerLockControls(camera, document.body);
@@ -175,21 +221,12 @@
 
         camera.position.set(0, 3, 5);
         const keys = { z: false, s: false, q: false, d: false, space: false };
-        let velocity = new THREE.Vector3(); 
-        let direction = new THREE.Vector3();
-        let canJump = false; 
-        let hasMakerPen = false; 
-        let menuOpen = false; 
-        let watchOpen = false;
-        let chatOpen = false;
-        let currentTool = 'none'; 
-        let blockSelectionne = null;
+        let velocity = new THREE.Vector3(); let direction = new THREE.Vector3();
+        let canJump = false; let menuOpen = false; let watchOpen = false; let chatOpen = false;
+        let currentTool = 'none'; let blockSelectionne = null;
 
         document.addEventListener('keydown', (e) => {
-            // SI LE CHAT EST OUVERT, ON NE CAPTURE PAS LES TOUCHES DE DEPLACEMENT
-            if(chatOpen && e.key !== 'Enter' && e.key !== '=') {
-                return; 
-            }
+            if(chatOpen && e.key !== 'Enter' && e.key !== '=') return; 
 
             const key = e.key.toLowerCase();
             if(key === 'z' || e.code === 'KeyW') keys.z = true; 
@@ -198,35 +235,19 @@
             if(key === 'd') keys.d = true; 
             if(e.code === 'Space') keys.space = true;
             
-            // SYSTEME DE CHAT COMMANDE TOUCHE [ = ]
             if(e.key === '=') {
-                e.preventDefault();
-                chatOpen = !chatOpen;
+                e.preventDefault(); chatOpen = !chatOpen;
                 if(chatOpen) {
-                    controls.unlock();
-                    chatInput.style.display = 'block';
-                    setTimeout(() => chatInput.focus(), 50);
+                    controls.unlock(); chatInput.style.display = 'block'; setTimeout(() => chatInput.focus(), 50);
                 } else {
-                    chatInput.style.display = 'none';
-                    chatInput.value = '';
-                    controls.lock();
-                }
-                return;
+                    chatInput.style.display = 'none'; chatInput.value = ''; controls.lock();
+                } return;
             }
 
-            // ENVOYER LE MESSAGE AVEC LA TOUCHE ENTRÉE
             if(e.key === 'Enter' && chatOpen) {
-                e.preventDefault();
-                const msg = chatInput.value.trim();
-                if(msg.length > 0) {
-                    appendMessage(myName, msg, 'me');
-                    sendNetworkData({ type: 'chat', name: myName, message: msg });
-                }
-                chatInput.value = '';
-                chatInput.style.display = 'none';
-                chatOpen = false;
-                controls.lock();
-                return;
+                e.preventDefault(); const msg = chatInput.value.trim();
+                if(msg.length > 0) { appendMessage(myName, msg, 'me'); sendNetworkData({ type: 'chat', name: myName, message: msg }); }
+                chatInput.value = ''; chatInput.style.display = 'none'; chatOpen = false; controls.lock(); return;
             }
             
             if(key === 'e' && hasMakerPen && !watchOpen) { 
@@ -235,9 +256,7 @@
                 else { makerMenu.style.display = 'none'; controls.lock(); } 
             }
             if(e.code === 'Tab') { 
-                e.preventDefault(); 
-                if(menuOpen) return; 
-                watchOpen = !watchOpen; 
+                e.preventDefault(); if(menuOpen) return; watchOpen = !watchOpen; 
                 if(watchOpen) { controls.unlock(); watchUi.style.display = 'flex'; } 
                 else { watchUi.style.display = 'none'; controls.lock(); } 
             }
@@ -254,218 +273,213 @@
         });
 
         function appendMessage(sender, text, type) {
-            const p = document.createElement('p');
-            p.className = 'chat-msg';
+            const p = document.createElement('p'); p.className = 'chat-msg';
             if(type === 'system') p.innerHTML = `<span class="chat-system">[Système]</span> ${text}`;
+            else if(type === 'combat') p.innerHTML = `<span class="chat-combat">[COMBAT]</span> ${text}`;
             else if(type === 'me') p.innerHTML = `<span class="chat-me">[${sender}]</span> : ${text}`;
             else p.innerHTML = `<span class="chat-peer">[${sender}]</span> : ${text}`;
-            chatArea.appendChild(p);
-            chatArea.scrollTop = chatArea.scrollHeight;
+            chatArea.appendChild(p); chatArea.scrollTop = chatArea.scrollHeight;
         }
 
         window.setTool = function(tool) {
-            currentTool = tool; 
-            document.getElementById('current-tool-txt').innerText = "Outil actuel : " + tool.toUpperCase();
-            document.getElementById('btn-draw').classList.remove('active'); 
-            document.getElementById('btn-reshape').classList.remove('active'); 
-            document.getElementById('btn-delete').classList.remove('active');
+            currentTool = tool; document.getElementById('current-tool-txt').innerText = "Outil actuel : " + tool.toUpperCase();
+            document.getElementById('btn-draw').classList.remove('active'); document.getElementById('btn-reshape').classList.remove('active'); document.getElementById('btn-delete').classList.remove('active');
             if(tool === 'draw') document.getElementById('btn-draw').classList.add('active'); 
             if(tool === 'reshape') document.getElementById('btn-reshape').classList.add('active'); 
             if(tool === 'delete') document.getElementById('btn-delete').classList.add('active');
-            menuOpen = false; 
-            makerMenu.style.display = 'none'; 
-            controls.lock();
+            menuOpen = false; makerMenu.style.display = 'none'; controls.lock();
         }
 
         // --- 3. LOGIQUE RESEAU P2P SYNCHRONISÉE ---
-        let peer = null; 
-        let conn = null; 
-        let remotePlayerMesh = null;
-        let myName = "RecPlayer"; 
-        let remoteName = "Ami";
+        let peer = null; let conn = null; let remotePlayerMesh = null;
+        let myName = "RecPlayer"; let remoteName = "Ami";
 
         window.initPeer = function() {
-            myName = document.getElementById('username-input').value || "Player"; 
-            document.getElementById('btn-init').innerText = "Création...";
+            myName = document.getElementById('username-input').value || "Player"; document.getElementById('btn-init').innerText = "Création...";
             const shortRoomCode = Math.floor(1000 + Math.random() * 9000).toString();
-            
             peer = new Peer('recroom-' + shortRoomCode);
             peer.on('open', (id) => {
                 const cleanCode = id.replace('recroom-', '');
                 document.getElementById('my-code-txt').innerText = "Code Salon : " + cleanCode; 
                 document.getElementById('status-bar').innerText = "🌐 Salon [" + cleanCode + "] - En attente...";
-                document.getElementById('btn-init').style.display = 'none'; 
-                document.getElementById('username-input').disabled = true;
-                appendMessage("System", `Salon créé. Code : ${cleanCode}. Partage ce code avec un ami !`, 'system');
+                document.getElementById('btn-init').style.display = 'none'; document.getElementById('username-input').disabled = true;
+                appendMessage("System", `Salon créé. Code : ${cleanCode}.`, 'system');
             });
-            
-            peer.on('connection', (connection) => { 
-                conn = connection; 
-                setupConnectionHandlers(); 
-            });
+            peer.on('connection', (connection) => { conn = connection; setupConnectionHandlers(); });
         }
 
         window.connectToPeer = function() {
             myName = document.getElementById('username-input').value || "Player";
             const targetCode = document.getElementById('peer-id-input').value.trim();
             if(!targetCode) return alert("Rentre un code !");
-            
             if(!peer) peer = new Peer();
-            peer.on('open', () => { 
-                conn = peer.connect('recroom-' + targetCode); 
-                setupConnectionHandlers(); 
-            });
+            peer.on('open', () => { conn = peer.connect('recroom-' + targetCode); setupConnectionHandlers(); });
         }
 
         function setupConnectionHandlers() {
-            document.getElementById('status-bar').innerText = "🌐 CONNECTÉ EN MULTIJOUEUR !"; 
-            watchOpen = false; 
-            watchUi.style.display = 'none'; 
-            controls.lock();
-            
+            document.getElementById('status-bar').innerText = "🌐 CONNECTÉ EN MULTIJOUEUR !"; watchOpen = false; watchUi.style.display = 'none'; controls.lock();
             if(!remotePlayerMesh) {
-                const avatarGeo = new THREE.CylinderGeometry(0.4, 0.4, 2, 16);
-                const avatarMat = new THREE.MeshStandardMaterial({ color: 0x3498db, roughness: 0.5 });
-                remotePlayerMesh = new THREE.Mesh(avatarGeo, avatarMat);
+                remotePlayerMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 2, 16), new THREE.MeshStandardMaterial({ color: 0x3498db, roughness: 0.5 }));
                 scene.add(remotePlayerMesh);
             }
-
-            setTimeout(() => {
-                sendNetworkData({ type: 'handshake', name: myName });
-            }, 600);
-
-            conn.on('open', () => {
-                sendNetworkData({ type: 'handshake', name: myName });
-            });
+            setTimeout(() => { sendNetworkData({ type: 'handshake', name: myName }); }, 600);
+            conn.on('open', () => { sendNetworkData({ type: 'handshake', name: myName }); });
 
             conn.on('data', (data) => {
-                if (data.type === 'handshake') {
-                    remoteName = data.name;
-                    appendMessage("System", `${remoteName} a rejoint la chambre !`, 'system');
+                if (data.type === 'handshake') { remoteName = data.name; appendMessage("System", `${remoteName} a rejoint !`, 'system'); }
+                if (data.type === 'move') { if (remotePlayerMesh) remotePlayerMesh.position.set(data.x, data.y - 1, data.z); }
+                if (data.type === 'chat') appendMessage(data.name, data.message, 'peer');
+                if (data.type === 'build') createCubeGraphics(data.x, data.y, data.z, data.sx||1, data.sy||1, data.sz||1);
+                if (data.type === 'reshape') reshapeCubeGraphics(data.x, data.y, data.z, data.sx, data.sy, data.sz);
+                if (data.type === 'delete') removeCubeGraphics(data.x, data.y, data.z);
+                if (data.type === 'ballShoot') { basketBall.position.set(data.px, data.py, data.pz); ballVelocity.set(data.vx, data.vy, data.vz); }
+                if (data.type === 'scoreUpdate') { globalScore = data.score; document.getElementById('score-val').innerText = globalScore; }
+                if (data.type === 'targetScoreUpdate') { targetScore = data.score; document.getElementById('score-targets').innerText = targetScore; }
+                
+                // Synchronisation des tirs laser et impacts PvP reçus
+                if (data.type === 'laserShot') { renderLaserTrail(data.from, data.to); }
+                if (data.type === 'pvpHit') {
+                    appendMessage("Combat", `Tu as été touché par ${data.by} !`, 'combat');
+                    flashPlayerRed();
                 }
-                if (data.type === 'move') {
-                    if (remotePlayerMesh) {
-                        remotePlayerMesh.position.set(data.x, data.y - 1, data.z);
-                    }
-                }
-                if (data.type === 'chat') {
-                    appendMessage(data.name, data.message, 'peer');
-                }
-                if (data.type === 'build') {
-                    createCubeGraphics(data.x, data.y, data.z, data.sx||1, data.sy||1, data.sz||1);
-                }
-                if (data.type === 'reshape') {
-                    reshapeCubeGraphics(data.x, data.y, data.z, data.sx, data.sy, data.sz);
-                }
-                if (data.type === 'delete') {
-                    removeCubeGraphics(data.x, data.y, data.z);
-                }
-                if (data.type === 'ballShoot') {
-                    basketBall.position.set(data.px, data.py, data.pz); 
-                    ballVelocity.set(data.vx, data.vy, data.vz); 
-                }
-                if (data.type === 'scoreUpdate') {
-                    globalScore = data.score; 
-                    document.getElementById('score-val').innerText = globalScore; 
+                // Synchro des positions des armes quand elles sont reposées par terre
+                if (data.type === 'weaponDropped') {
+                    if(data.weapon === 'makerpen') { scene.add(makerPen); makerPen.position.set(data.x, 2.2, data.z); makerPen.rotation.set(0,0,0); }
+                    if(data.weapon === 'laserpistol') { scene.add(laserPistol); laserPistol.position.set(data.x, 1.2, data.z); laserPistol.rotation.set(0,0,0); }
                 }
             });
         }
-
-        function sendNetworkData(dataObj) { 
-            if (conn && conn.open) {
-                conn.send(dataObj); 
-            }
-        }
+        function sendNetworkData(dataObj) { if (conn && conn.open) conn.send(dataObj); }
 
         function updatePseudoTag() {
-            if (!remotePlayerMesh) return; 
-            const wp = new THREE.Vector3(); 
-            remotePlayerMesh.getWorldPosition(wp); 
-            wp.y += 1.4; 
-            wp.project(camera);
-            
-            if(wp.z > 1) { 
-                nametag.style.display = 'none'; 
-                return; 
-            }
-            const x = (wp.x * .5 + .5) * window.innerWidth; 
-            const y = (-(wp.y * .5) + .5) * window.innerHeight;
-            nametag.style.left = `${x}px`; 
-            nametag.style.top = `${y}px`; 
-            nametag.innerText = remoteName; 
-            nametag.style.display = 'block';
+            if (!remotePlayerMesh) return; const wp = new THREE.Vector3(); remotePlayerMesh.getWorldPosition(wp); wp.y += 1.4; wp.project(camera);
+            if(wp.z > 1) { nametag.style.display = 'none'; return; }
+            const x = (wp.x * .5 + .5) * window.innerWidth; const y = (-(wp.y * .5) + .5) * window.innerHeight;
+            nametag.style.left = `${x}px`; nametag.style.top = `${y}px`; nametag.innerText = remoteName; nametag.style.display = 'block';
         }
 
-        // --- 4. ENGINE DE CONSTRUCTION & SHOOT BALLON ---
-        const raycaster = new THREE.Raycaster(); 
-        const mouse = new THREE.Vector2(0, 0);
+        // --- 4. LOGIQUE DES TIRS ET DE L'INVENTAIRE ---
+        function renderLaserTrail(fromPos, toPos) {
+            const points = [new THREE.Vector3(fromPos.x, fromPos.y, fromPos.z), new THREE.Vector3(toPos.x, toPos.y, toPos.z)];
+            const laserGeo = new THREE.BufferGeometry().setFromPoints(points);
+            const laserMat = new THREE.LineBasicMaterial({ color: 0xff3300, linewidth: 3 });
+            const line = new THREE.Line(laserGeo, laserMat); scene.add(line);
+            setTimeout(() => { scene.remove(line); }, 80);
+        }
+
+        function flashPlayerRed() {
+            let origBg = scene.background; scene.background = new THREE.Color(0x962d22);
+            setTimeout(() => { scene.background = origBg; }, 150);
+        }
+
+        const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2(0, 0);
 
         document.addEventListener('pointerdown', () => {
             if (!controls.isLocked || chatOpen) return;
             raycaster.setFromCamera(mouse, camera);
 
-            // CLIC SUR LE BALLON POUR SHOOTER
+            // LOGIQUE DE TIR DU PISTOLET LASER
+            if (hasLaserPistol) {
+                const startPos = camera.position.clone().add(new THREE.Vector3(0.3, -0.4, -0.5).applyQuaternion(camera.quaternion));
+                const endPos = new THREE.Vector3();
+                
+                // Vérifier d'abord si on touche l'autre Joueur (PvP)
+                let pvpIntersection = false;
+                if (remotePlayerMesh) {
+                    const hitPlayer = raycaster.intersectObject(remotePlayerMesh);
+                    if (hitPlayer.length > 0 && hitPlayer[0].distance < 35) {
+                        endPos.copy(hitPlayer[0].point); pvpIntersection = true;
+                        pvpScore++; document.getElementById('score-pvp').innerText = pvpScore;
+                        appendMessage("Combat", `Tu as touché ${remoteName} !`, 'combat');
+                        sendNetworkData({ type: 'pvpHit', by: myName });
+                    }
+                }
+
+                // Si pas de PvP, vérifier les cibles du stand de tir
+                if (!pvpIntersection) {
+                    const hitTargets = raycaster.intersectObjects(targetsStandTir);
+                    if (hitTargets.length > 0 && hitTargets[0].distance < 40) {
+                        endPos.copy(hitTargets[0].point);
+                        targetScore++; document.getElementById('score-targets').innerText = targetScore;
+                        sendNetworkData({ type: 'targetScoreUpdate', score: targetScore });
+                        
+                        // Flash la cible en vert temporairement
+                        const obj = hitTargets[0].object; obj.material.color.setHex(0x2ecc71);
+                        setTimeout(() => obj.material.color.setHex(0xc0392b), 150);
+                    } else {
+                        // Impact sur le décor général
+                        const hitEnv = raycaster.intersectObjects(targetsClickables);
+                        if (hitEnv.length > 0) endPos.copy(hitEnv[0].point);
+                        else { const dir = new THREE.Vector3(); camera.getWorldDirection(dir); endPos.copy(camera.position).addScaledVector(dir, 40); }
+                    }
+                }
+
+                renderLaserTrail(startPos, endPos);
+                sendNetworkData({ type: 'laserShot', from: startPos, to: endPos });
+                return;
+            }
+
+            // RAMASSAGE DES ARMES ET GESTION DE LA POSE DE L'AUTRE OBJET
+            // 1. Clic sur le Ballon de Basket
             const ballHit = raycaster.intersectObject(basketBall);
             if (ballHit.length > 0 && camera.position.distanceTo(basketBall.position) < 6) {
-                const shootDir = new THREE.Vector3(); 
-                camera.getWorldDirection(shootDir);
-                shootDir.y += 0.35; 
-                shootDir.normalize();
-                ballVelocity.copy(shootDir.multiplyScalar(15)); 
-                
-                sendNetworkData({ 
-                    type: 'ballShoot', 
-                    px: basketBall.position.x, 
-                    py: basketBall.position.y, 
-                    pz: basketBall.position.z, 
-                    vx: ballVelocity.x, 
-                    vy: ballVelocity.y, 
-                    vz: ballVelocity.z 
-                });
+                const shootDir = new THREE.Vector3(); camera.getWorldDirection(shootDir); shootDir.y += 0.35; shootDir.normalize();
+                ballVelocity.copy(shootDir.multiplyScalar(15));
+                sendNetworkData({ type: 'ballShoot', px: basketBall.position.x, py: basketBall.position.y, pz: basketBall.position.z, vx: ballVelocity.x, vy: ballVelocity.y, vz: ballVelocity.z });
                 return;
             }
 
-            // RAMASSAGE MAKER PEN
+            // 2. Clic sur le Maker Pen au sol
             if (!hasMakerPen) {
                 const penHit = raycaster.intersectObjects(makerPen.children);
-                if (penHit.length > 0) {
-                    hasMakerPen = true; 
-                    infoInteraction.style.display = 'none'; 
-                    scene.remove(makerPen); 
-                    camera.add(makerPen);
-                    makerPen.position.set(0.35, -0.3, -0.6); 
-                    makerPen.rotation.set(0.2, Math.PI + 0.3, 0); 
-                    setTool('draw');
-                } 
-                return;
+                if (penHit.length > 0 && camera.position.distanceTo(makerPen.position) < 6) {
+                    // Si on portait déjà le Pistolet Laser, on le pose par terre !
+                    if (hasLaserPistol) {
+                        hasLaserPistol = false; camera.remove(laserPistol); scene.add(laserPistol);
+                        laserPistol.position.set(camera.position.x, 1.2, camera.position.z);
+                        sendNetworkData({ type: 'weaponDropped', weapon: 'laserpistol', x: camera.position.x, z: camera.position.z });
+                    }
+                    hasMakerPen = true; infoInteraction.style.display = 'none'; scene.remove(makerPen); camera.add(makerPen);
+                    makerPen.position.set(0.35, -0.3, -0.6); makerPen.rotation.set(0.2, Math.PI + 0.3, 0); setTool('draw');
+                    return;
+                }
             }
 
-            if (currentTool === 'draw') {
-                const intersects = raycaster.intersectObjects(targetsClickables);
-                if (intersects.length > 0) {
-                    const intersect = intersects[0]; 
-                    const pos = intersect.point.clone().add(intersect.face.normal.clone().multiplyScalar(0.5));
-                    const gridX = Math.round(pos.x); 
-                    const gridY = Math.round(pos.y * 2) / 2; 
-                    const gridZ = Math.round(pos.z);
-                    createCubeGraphics(gridX, gridY, gridZ, 1, 1, 1);
-                    sendNetworkData({ type: 'build', x: gridX, y: gridY, z: gridZ, sx: 1, sy: 1, sz: 1 });
+            // 3. Clic sur le Laser Pistol au sol
+            if (!hasLaserPistol) {
+                const pistolHit = raycaster.intersectObjects(laserPistol.children);
+                if (pistolHit.length > 0 && camera.position.distanceTo(laserPistol.position) < 6) {
+                    // Si on portait déjà le Maker Pen, on le pose par terre !
+                    if (hasMakerPen) {
+                        hasMakerPen = false; currentTool = 'none'; camera.remove(makerPen); scene.add(makerPen);
+                        makerPen.position.set(camera.position.x, 2.2, camera.position.z);
+                        sendNetworkData({ type: 'weaponDropped', weapon: 'makerpen', x: camera.position.x, z: camera.position.z });
+                    }
+                    hasLaserPistol = true; infoInteraction.style.display = 'none'; scene.remove(laserPistol); camera.add(laserPistol);
+                    laserPistol.position.set(0.3, -0.35, -0.5); laserPistol.rotation.set(0, Math.PI, 0);
+                    return;
                 }
-            } else if (currentTool === 'reshape') {
-                const intersects = raycaster.intersectObjects(cubesDessines);
-                if (intersects.length > 0) { 
-                    blockSelectionne = intersects[0].object; 
-                    blockSelectionne.material.color.setHex(0x4CAF50); 
-                }
-            } else if (currentTool === 'delete') {
-                const intersects = raycaster.intersectObjects(cubesDessines);
-                if (intersects.length > 0) {
-                    const hitCube = intersects[0].object; 
-                    const cX = hitCube.position.x; 
-                    const cY = hitCube.position.y; 
-                    const cZ = hitCube.position.z;
-                    removeCubeGraphics(cX, cY, cZ); 
-                    sendNetworkData({ type: 'delete', x: cX, y: cY, z: cZ });
+            }
+
+            // MODES OUTILS MAKER PEN CONTINUS
+            if (hasMakerPen) {
+                if (currentTool === 'draw') {
+                    const intersects = raycaster.intersectObjects(targetsClickables);
+                    if (intersects.length > 0) {
+                        const intersect = intersects[0]; const pos = intersect.point.clone().add(intersect.face.normal.clone().multiplyScalar(0.5));
+                        const gridX = Math.round(pos.x); const gridY = Math.round(pos.y * 2) / 2; const gridZ = Math.round(pos.z);
+                        createCubeGraphics(gridX, gridY, gridZ, 1, 1, 1);
+                        sendNetworkData({ type: 'build', x: gridX, y: gridY, z: gridZ, sx: 1, sy: 1, sz: 1 });
+                    }
+                } else if (currentTool === 'reshape') {
+                    const intersects = raycaster.intersectObjects(cubesDessines);
+                    if (intersects.length > 0) { blockSelectionne = intersects[0].object; blockSelectionne.material.color.setHex(0x4CAF50); }
+                } else if (currentTool === 'delete') {
+                    const intersects = raycaster.intersectObjects(cubesDessines);
+                    if (intersects.length > 0) {
+                        const hitCube = intersects[0].object; const cX = hitCube.position.x; const cY = hitCube.position.y; const cZ = hitCube.position.z;
+                        removeCubeGraphics(cX, cY, cZ); sendNetworkData({ type: 'delete', x: cX, y: cY, z: cZ });
+                    }
                 }
             }
         });
@@ -480,130 +494,93 @@
 
         document.addEventListener('wheel', (e) => {
             if (controls.isLocked && currentTool === 'reshape' && blockSelectionne && !chatOpen) {
-                const change = e.deltaY < 0 ? 0.1 : -0.1; 
-                blockSelectionne.scale.x += change; 
-                blockSelectionne.scale.y += change; 
-                blockSelectionne.scale.z += change;
+                const change = e.deltaY < 0 ? 0.1 : -0.1; blockSelectionne.scale.x += change; blockSelectionne.scale.y += change; blockSelectionne.scale.z += change;
                 if (blockSelectionne.scale.x < 0.2) blockSelectionne.scale.set(0.2, 0.2, 0.2);
                 sendNetworkData({ type: 'reshape', x: blockSelectionne.position.x, y: blockSelectionne.position.y, z: blockSelectionne.position.z, sx: blockSelectionne.scale.x, sy: blockSelectionne.scale.y, sz: blockSelectionne.scale.z });
             }
         });
 
         function createCubeGraphics(x, y, z, sx, sy, sz) {
-            const cubeGeo = new THREE.BoxGeometry(1, 1, 1); 
-            const cubeMat = new THREE.MeshStandardMaterial({ color: 0xffa500, roughness: 0.5 });
-            const newCube = new THREE.Mesh(cubeGeo, cubeMat); 
-            newCube.position.set(x, y, z); 
-            newCube.scale.set(sx, sy, sz);
-            scene.add(newCube); 
-            targetsClickables.push(newCube); 
-            cubesDessines.push(newCube);
+            const cubeGeo = new THREE.BoxGeometry(1, 1, 1); const cubeMat = new THREE.MeshStandardMaterial({ color: 0xffa500, roughness: 0.5 });
+            const newCube = new THREE.Mesh(cubeGeo, cubeMat); newCube.position.set(x, y, z); newCube.scale.set(sx, sy, sz);
+            scene.add(newCube); targetsClickables.push(newCube); cubesDessines.push(newCube);
         }
-        function reshapeCubeGraphics(x, y, z, sx, sy, sz) { 
-            const cube = cubesDessines.find(c => c.position.x === x && c.position.y === y && c.position.z === z); 
-            if (cube) cube.scale.set(sx, sy, sz); 
-        }
+        function reshapeCubeGraphics(x, y, z, sx, sy, sz) { const cube = cubesDessines.find(c => c.position.x === x && c.position.y === y && c.position.z === z); if (cube) cube.scale.set(sx, sy, sz); }
         function removeCubeGraphics(x, y, z) {
             const hitCube = cubesDessines.find(c => c.position.x === x && c.position.y === y && c.position.z === z);
-            if (hitCube) { 
-                scene.remove(hitCube); 
-                const idx1 = targetsClickables.indexOf(hitCube); if(idx1 > -1) targetsClickables.splice(idx1, 1); 
-                const idx2 = cubesDessines.indexOf(hitCube); if(idx2 > -1) cubesDessines.splice(idx2, 1); 
-            }
+            if (hitCube) { scene.remove(hitCube); const idx1 = targetsClickables.indexOf(hitCube); if(idx1 > -1) targetsClickables.splice(idx1, 1); const idx2 = cubesDessines.indexOf(hitCube); if(idx2 > -1) cubesDessines.splice(idx2, 1); }
         }
 
         // --- 5. LOGIQUE DE JEU & RENDER LOOP ---
-        const clock = new THREE.Clock(); 
-        let lastSendTime = 0;
+        const clock = new THREE.Clock(); let lastSendTime = 0;
 
         function animate() {
-            requestAnimationFrame(animate); 
-            const delta = clock.getDelta();
+            requestAnimationFrame(animate); const delta = clock.getDelta();
 
             // PHYSIQUE DU BALLON DE BASKET
             if (ballVelocity.lengthSq() > 0 || basketBall.position.y > 0.35) {
-                ballVelocity.y -= 9.8 * 2.2 * delta; 
-                basketBall.position.addScaledVector(ballVelocity, delta);
-
-                if (basketBall.position.y < 0.35) { 
-                    basketBall.position.y = 0.35; 
-                    ballVelocity.y = -ballVelocity.y * 0.68; 
-                    ballVelocity.x *= 0.92; 
-                    ballVelocity.z *= 0.92; 
-                }
-                if (Math.abs(basketBall.position.x) > 14.5) { ballVelocity.x = -ballVelocity.x * 0.7; basketBall.position.x = Math.sign(basketBall.position.x) * 14.5; }
-                if (Math.abs(basketBall.position.z) > 14.5) { ballVelocity.z = -ballVelocity.z * 0.7; basketBall.position.z = Math.sign(basketBall.position.z) * 14.5; }
-
+                ballVelocity.y -= 9.8 * 2.2 * delta; basketBall.position.addScaledVector(ballVelocity, delta);
+                if (basketBall.position.y < 0.35) { basketBall.position.y = 0.35; ballVelocity.y = -ballVelocity.y * 0.68; ballVelocity.x *= 0.92; ballVelocity.z *= 0.92; }
+                if (Math.abs(basketBall.position.x) > 14.5 && basketBall.position.z < -5) { ballVelocity.x = -ballVelocity.x * 0.7; basketBall.position.x = Math.sign(basketBall.position.x) * 14.5; }
+                
                 const distToHoop = basketBall.position.distanceTo(new THREE.Vector3(0, 7.2, -13.8));
                 if (distToHoop < 0.52 && ballVelocity.y < 0 && canScore) {
-                    globalScore++;
-                    document.getElementById('score-val').innerText = globalScore;
-                    canScore = false; 
-                    setTimeout(() => canScore = true, 1200); 
+                    globalScore++; document.getElementById('score-val').innerText = globalScore;
+                    canScore = false; setTimeout(() => canScore = true, 1200);
                     sendNetworkData({ type: 'scoreUpdate', score: globalScore });
                 }
-
                 if (ballVelocity.lengthSq() < 0.04 && basketBall.position.y <= 0.35) ballVelocity.set(0, 0, 0);
             }
 
-            if (remotePlayerMesh) {
-                updatePseudoTag();
-            }
+            // ANIMATION DES CIBLES DU STAND DE TIR
+            targetsStandTir.forEach((tgt, index) => {
+                tgt.position.y += Math.sin(clock.getElapsedTime() * 2 + index) * 0.015;
+            });
+
+            if (remotePlayerMesh) updatePseudoTag();
 
             if (controls.isLocked && !chatOpen) {
-                velocity.x -= velocity.x * 10.0 * delta; 
-                velocity.z -= velocity.z * 10.0 * delta; 
-                velocity.y -= 9.8 * 3.0 * delta;
-                
-                direction.z = Number(keys.z) - Number(keys.s); 
-                direction.x = Number(keys.d) - Number(keys.q); 
-                direction.normalize();
+                velocity.x -= velocity.x * 10.0 * delta; velocity.z -= velocity.z * 10.0 * delta; velocity.y -= 9.8 * 3.0 * delta;
+                direction.z = Number(keys.z) - Number(keys.s); direction.x = Number(keys.d) - Number(keys.q); direction.normalize();
 
-                if (keys.z || keys.s) velocity.z -= direction.z * 80.0 * delta; 
-                if (keys.q || keys.d) velocity.x -= direction.x * 80.0 * delta;
+                if (keys.z || keys.s) velocity.z -= direction.z * 80.0 * delta; if (keys.q || keys.d) velocity.x -= direction.x * 80.0 * delta;
 
-                controls.moveRight(-velocity.x * delta); 
-                controls.moveForward(-velocity.z * delta); 
-                camera.position.y += velocity.y * delta;
-                
+                controls.moveRight(-velocity.x * delta); controls.moveForward(-velocity.z * delta); camera.position.y += velocity.y * delta;
                 if (camera.position.y < 3.0) { velocity.y = 0; camera.position.y = 3.0; canJump = true; }
                 if (keys.space && canJump) { velocity.y += 11.0; canJump = false; }
 
-                if(camera.position.x > 14) camera.position.x = 14; if(camera.position.x < -14) camera.position.x = -14;
-                if(camera.position.z > 14) camera.position.z = 14; if(camera.position.z < -14) camera.position.z = -14;
+                // LIMITES COLLISION EXTENSION SALLES
+                if (camera.position.x < -14) camera.position.x = -14;
+                if (camera.position.x > 44) camera.position.x = 44;
+                if (Math.abs(camera.position.z) > 14) camera.position.z = Math.sign(camera.position.z) * 14;
+                // Mur de séparation invisible (sauf au niveau de la porte centrale entre z=-5 et z=5)
+                if (camera.position.x > 14 && camera.position.x < 16 && Math.abs(camera.position.z) > 4.5) {
+                    camera.position.x = camera.position.x < 15 ? 13.9 : 16.1;
+                }
 
+                // DÉTECTION DU VISEUR EN FACE D'UN OBJET
                 raycaster.setFromCamera(mouse, camera);
                 if (!hasMakerPen && raycaster.intersectObjects(makerPen.children).length > 0 && camera.position.distanceTo(makerPen.position) < 6) {
-                    infoInteraction.innerText = "Clique pour ramasser le Maker Pen !"; 
-                    infoInteraction.style.display = 'block';
+                    infoInteraction.innerText = "Clique pour ramasser le Maker Pen !"; infoInteraction.style.display = 'block';
+                } else if (!hasLaserPistol && raycaster.intersectObjects(laserPistol.children).length > 0 && camera.position.distanceTo(laserPistol.position) < 6) {
+                    infoInteraction.innerText = "Clique pour équiper le Pistolet Laser !"; infoInteraction.style.display = 'block';
                 } else if (raycaster.intersectObject(basketBall).length > 0 && camera.position.distanceTo(basketBall.position) < 5) {
-                    infoInteraction.innerText = "Clique pour shooter dans le ballon !"; 
-                    infoInteraction.style.display = 'block';
-                } else { 
-                    infoInteraction.style.display = 'none'; 
-                }
+                    infoInteraction.innerText = "Clique pour shooter dans le ballon !"; infoInteraction.style.display = 'block';
+                } else { infoInteraction.style.display = 'none'; }
 
                 const now = performance.now();
-                if (now - lastSendTime > 30) { 
-                    sendNetworkData({ type: 'move', x: camera.position.x, y: camera.position.y, z: camera.position.z }); 
-                    lastSendTime = now; 
-                }
+                if (now - lastSendTime > 30) { sendNetworkData({ type: 'move', x: camera.position.x, y: camera.position.y, z: camera.position.z }); lastSendTime = now; }
             }
 
-            if (!hasMakerPen) { 
-                makerPen.rotation.y += 0.015; 
-                makerPen.position.y = 2.2 + Math.sin(clock.getElapsedTime() * 2.5) * 0.08; 
-            }
+            // Flottaison au sol des objets non ramassés
+            if (!hasMakerPen) { makerPen.rotation.y += 0.015; makerPen.position.y = 2.2 + Math.sin(clock.getElapsedTime() * 2.5) * 0.08; }
+            if (!hasLaserPistol) { laserPistol.rotation.y -= 0.01; laserPistol.position.y = 1.2 + Math.cos(clock.getElapsedTime() * 2) * 0.05; }
             
             renderer.render(scene, camera);
         }
         animate();
 
-        window.addEventListener('resize', () => { 
-            camera.aspect = window.innerWidth / window.innerHeight; 
-            camera.updateProjectionMatrix(); 
-            renderer.setSize(window.innerWidth, window.innerHeight); 
-        });
+        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
     </script>
 </body>
 </html>
